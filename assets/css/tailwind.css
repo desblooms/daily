@@ -1,0 +1,88 @@
+ 
+/* 
+This file should contain the compiled Tailwind CSS.
+For development, you can use the CDN link in HTML files.
+For production, compile Tailwind CSS using:
+
+npm install tailwindcss
+npx tailwindcss build -i input.css -o assets/css/tailwind.css
+
+Input CSS (input.css):
+*/
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom utilities for the app */
+@layer utilities {
+    .status-pending {
+        @apply bg-yellow-100 text-yellow-700;
+    }
+    
+    .status-progress {
+        @apply bg-blue-100 text-blue-700;
+    }
+    
+    .status-done {
+        @apply bg-green-100 text-green-700;
+    }
+    
+    .status-approved {
+        @apply bg-purple-100 text-purple-700;
+    }
+    
+    .status-hold {
+        @apply bg-red-100 text-red-700;
+    }
+    
+    .compact-card {
+        @apply p-2 bg-white rounded-lg shadow-sm;
+    }
+    
+    .compact-button {
+        @apply px-3 py-1 rounded-lg text-xs font-medium;
+    }
+    
+    .bottom-nav {
+        @apply fixed bottom-0 left-0 right-0 bg-white shadow-inner flex justify-around py-2;
+    }
+    
+    .nav-item {
+        @apply text-xs flex flex-col items-center gap-1;
+    }
+    
+    .nav-item.active {
+        @apply text-blue-600 font-semibold;
+    }
+    
+    .nav-item.inactive {
+        @apply text-gray-500;
+    }
+}
+
+/* Mobile-first responsive design */
+@media (max-width: 640px) {
+    .mobile-compact {
+        @apply text-xs p-1;
+    }
+    
+    .mobile-title {
+        @apply text-sm font-semibold;
+    }
+    
+    .mobile-meta {
+        @apply text-xs text-gray-500;
+    }
+}
+
+/* Dark mode support (optional) */
+@media (prefers-color-scheme: dark) {
+    .dark-mode {
+        @apply bg-gray-900 text-white;
+    }
+    
+    .dark-card {
+        @apply bg-gray-800 border-gray-700;
+    }
+}
