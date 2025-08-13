@@ -5,21 +5,38 @@ require_once 'includes/functions.php';
 
 requireLogin();
 
-$currentPage = $_GET['page'] ?? 'tasks';
+$currentPage = $_GET['page'] ?? 'today';
 $selectedDate = $_GET['date'] ?? date('Y-m-d');
 
-// Get user's tasks for selected date
-$tasks = getTasks($_SESSION['user_id'], $selectedDate);
+// Get user's tasks based on current page
+switch ($currentPage) {
+    case 'today':
+        $tasks = getTasks($_SESSION['user_id'], date('Y-m-d'));
+        $pageTitle = "Today's Tasks";
+        break;
+    case 'week':
+        $tasks = getWeekTasks($_SESSION['user_id']);
+        $pageTitle = "This Week";
+        break;
+    case 'all':
+        $tasks = getTasks($_SESSION['user_id']);
+        $pageTitle = "All Tasks";
+        break;
+    default:
+        $tasks = getTasks($_SESSION['user_id'], $selectedDate);
+        $pageTitle = "Tasks for " . date('M j', strtotime($selectedDate));
+}
 
 // Get user stats
 $userStats = getUserStats($_SESSION['user_id']);
+$notifications = getUserNotifications($_SESSION['user_id'], true, 5);
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Daily Tasks - Calendar App</title>
+    <title><?= $pageTitle ?> - Daily Calendar</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -39,10 +56,8 @@ $userStats = getUserStats($_SESSION['user_id']);
     <style>
         .glass-effect {
             backdrop-filter: blur(10px);
-            background: rgba(255, 255, 255, 0.9);
-        }
-        .floating-action {
-            box-shadow: 0 4px 20px rgba(59, 130, 246, 0.3);
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
         .task-card {
             transition: all 0.2s ease;
@@ -50,37 +65,61 @@ $userStats = getUserStats($_SESSION['user_id']);
         .task-card:active {
             transform: scale(0.98);
         }
-        .bottom-nav-item {
-            transition: all 0.2s ease;
+        .floating-action {
+            box-shadow: 0 8px 25px rgba(59, 130, 246, 0.3);
         }
-        .bottom-nav-item.active {
-            transform: translateY(-2px);
+        .slide-up {
+            animation: slideUp 0.3s ease-out;
+        }
+        @keyframes slideUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .notification-dot {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
         }
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen pb-20">
-    <!-- Header -->
+    <!-- Header with Glass Effect -->
     <header class="sticky top-0 z-40 glass-effect border-b border-gray-200">
-        <div class="px-4 py-4">
+        <div class="px-4 py-3">
             <div class="flex items-center justify-between">
                 <div class="flex items-center space-x-3">
-                    <div class="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div class="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3a2 2 0 012-2h4a2 2 0 012 2v4m-6 4l2 2 4-4"></path>
                         </svg>
                     </div>
                     <div>
-                        <h1 class="text-lg font-bold text-gray-900"><?= getPageTitle($currentPage) ?></h1>
-                        <p class="text-xs text-gray-500"><?= date('F j, Y', strtotime($selectedDate)) ?></p>
+                        <h1 class="text-lg font-bold text-gray-900"><?= $pageTitle ?></h1>
+                        <p class="text-xs text-gray-500"><?= date('l, F j, Y') ?></p>
                     </div>
                 </div>
                 <div class="flex items-center space-x-2">
-                    <button onclick="refreshTasks()" class="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors">
-                        <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <!-- Notifications Bell -->
+                    <button onclick="toggleNotifications()" class="relative p-2 rounded-lg hover:bg-gray-100 transition-colors">
+                        <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+                        </svg>
+                        <?php if (count($notifications) > 0): ?>
+                            <span class="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full notification-dot"></span>
+                        <?php endif; ?>
+                    </button>
+                    
+                    <!-- Refresh Button -->
+                    <button onclick="refreshTasks()" class="p-2 rounded-lg hover:bg-gray-100 transition-colors">
+                        <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                         </svg>
                     </button>
-                    <div class="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                    
+                    <!-- User Avatar -->
+                    <div class="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
                         <span class="text-white font-semibold text-xs"><?= strtoupper(substr($_SESSION['user_name'], 0, 2)) ?></span>
                     </div>
                 </div>
@@ -88,196 +127,225 @@ $userStats = getUserStats($_SESSION['user_id']);
         </div>
     </header>
 
-    <!-- Content Area -->
-    <main class="px-4 py-4 space-y-4">
-        <?php if ($currentPage === 'tasks'): ?>
-            <!-- Date Selector -->
-            <div class="bg-white rounded-xl p-4 shadow-sm">
-                <div class="flex items-center justify-between mb-3">
-                    <h3 class="font-semibold text-gray-900">Select Date</h3>
-                    <button onclick="selectToday()" class="text-xs text-blue-600 font-medium">Today</button>
-                </div>
-                <input type="date" 
-                       value="<?= $selectedDate ?>" 
-                       onchange="changeDate(this.value)"
-                       class="w-full p-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+    <!-- Quick Stats Bar -->
+    <div class="px-4 py-3 bg-white border-b border-gray-100">
+        <div class="grid grid-cols-4 gap-2">
+            <div class="text-center">
+                <p class="text-lg font-bold text-green-600"><?= $userStats['completed'] ?? 0 ?></p>
+                <p class="text-xs text-gray-500">Done</p>
             </div>
+            <div class="text-center">
+                <p class="text-lg font-bold text-blue-600"><?= $userStats['in_progress'] ?? 0 ?></p>
+                <p class="text-xs text-gray-500">Active</p>
+            </div>
+            <div class="text-center">
+                <p class="text-lg font-bold text-yellow-600"><?= $userStats['pending'] ?? 0 ?></p>
+                <p class="text-xs text-gray-500">Pending</p>
+            </div>
+            <div class="text-center">
+                <p class="text-lg font-bold text-red-600"><?= $userStats['overdue'] ?? 0 ?></p>
+                <p class="text-xs text-gray-500">Overdue</p>
+            </div>
+        </div>
+    </div>
 
-            <!-- Tasks List -->
-            <div class="space-y-3">
-                <?php if (empty($tasks)): ?>
-                    <div class="bg-white rounded-xl p-8 text-center shadow-sm">
-                        <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                            </svg>
-                        </div>
-                        <p class="text-gray-500 mb-2">No tasks for this date</p>
-                        <p class="text-xs text-gray-400">Check back later for new assignments</p>
-                    </div>
-                <?php else: ?>
-                    <?php foreach ($tasks as $task): ?>
-                        <div class="task-card bg-white rounded-xl p-4 shadow-sm border border-gray-100" 
-                             onclick="openTaskDetail(<?= $task['id'] ?>)">
-                            <div class="flex items-start justify-between">
-                                <div class="flex-1">
-                                    <div class="flex items-center space-x-2 mb-2">
-                                        <h4 class="font-semibold text-gray-900 text-sm"><?= htmlspecialchars($task['title']) ?></h4>
-                                        <span class="px-2 py-1 text-xs rounded-full font-medium <?= getStatusStyle($task['status']) ?>">
-                                            <?= $task['status'] ?>
-                                        </span>
-                                    </div>
-                                    <?php if (!empty($task['details'])): ?>
-                                        <p class="text-xs text-gray-600 mb-3 line-clamp-2"><?= htmlspecialchars($task['details']) ?></p>
-                                    <?php endif; ?>
-                                    <div class="flex items-center justify-between">
-                                        <span class="text-xs text-gray-400">
-                                            <?= date('g:i A', strtotime($task['created_at'])) ?>
-                                        </span>
-                                        <div class="flex space-x-1">
-                                            <?php if ($task['status'] === 'Pending'): ?>
-                                                <button onclick="event.stopPropagation(); updateTaskStatus(<?= $task['id'] ?>, 'On Progress')" 
-                                                        class="px-3 py-1 bg-blue-500 text-white text-xs rounded-lg hover:bg-blue-600 transition-colors">
-                                                    Start
-                                                </button>
-                                            <?php elseif ($task['status'] === 'On Progress'): ?>
-                                                <button onclick="event.stopPropagation(); updateTaskStatus(<?= $task['id'] ?>, 'Done')" 
-                                                        class="px-3 py-1 bg-green-500 text-white text-xs rounded-lg hover:bg-green-600 transition-colors">
-                                                    Complete
-                                                </button>
-                                                <button onclick="event.stopPropagation(); updateTaskStatus(<?= $task['id'] ?>, 'On Hold')" 
-                                                        class="px-3 py-1 bg-yellow-500 text-white text-xs rounded-lg hover:bg-yellow-600 transition-colors">
-                                                    Hold
-                                                </button>
-                                            <?php elseif ($task['status'] === 'On Hold'): ?>
-                                                <button onclick="event.stopPropagation(); updateTaskStatus(<?= $task['id'] ?>, 'On Progress')" 
-                                                        class="px-3 py-1 bg-blue-500 text-white text-xs rounded-lg hover:bg-blue-600 transition-colors">
-                                                    Resume
-                                                </button>
-                                            <?php endif; ?>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
+    <!-- Date Navigation (for date-specific views) -->
+    <?php if ($currentPage !== 'all' && $currentPage !== 'week'): ?>
+    <div class="px-4 py-3 bg-white">
+        <div class="flex items-center justify-between">
+            <button onclick="changeDate(-1)" class="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors">
+                <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                </svg>
+            </button>
+            
+            <input type="date" 
+                   value="<?= $selectedDate ?>" 
+                   onchange="jumpToDate(this.value)"
+                   class="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            
+            <button onclick="changeDate(1)" class="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors">
+                <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                </svg>
+            </button>
+        </div>
+    </div>
+    <?php endif; ?>
+
+    <!-- Main Content Area -->
+    <main class="px-4 py-4 space-y-3">
+        <?php if (empty($tasks)): ?>
+            <!-- Empty State -->
+            <div class="bg-white rounded-2xl p-8 text-center shadow-sm slide-up">
+                <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                </div>
+                <h3 class="text-lg font-semibold text-gray-900 mb-2">No tasks found</h3>
+                <p class="text-sm text-gray-500 mb-4">You're all caught up! Check back later for new assignments.</p>
+                <?php if ($currentPage === 'today'): ?>
+                    <button onclick="showOtherDays()" class="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors">
+                        View Other Days
+                    </button>
                 <?php endif; ?>
             </div>
-
-        <?php elseif ($currentPage === 'analytics'): ?>
-            <!-- User Analytics -->
-            <div class="grid grid-cols-2 gap-4 mb-6">
-                <div class="bg-white rounded-xl p-4 shadow-sm">
-                    <div class="flex items-center space-x-3">
-                        <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                            <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
+        <?php else: ?>
+            <!-- Tasks List -->
+            <div class="space-y-3">
+                <?php foreach ($tasks as $index => $task): ?>
+                    <div class="task-card bg-white rounded-2xl p-4 shadow-sm border border-gray-100 slide-up" 
+                         style="animation-delay: <?= $index * 0.1 ?>s"
+                         onclick="openTaskDetail(<?= $task['id'] ?>)">
+                        
+                        <!-- Task Header -->
+                        <div class="flex items-start justify-between mb-3">
+                            <div class="flex-1">
+                                <div class="flex items-center space-x-2 mb-1">
+                                    <h4 class="font-semibold text-gray-900 text-sm line-clamp-1"><?= htmlspecialchars($task['title']) ?></h4>
+                                    <?php if ($task['priority'] === 'high'): ?>
+                                        <span class="w-2 h-2 bg-red-500 rounded-full"></span>
+                                    <?php endif; ?>
+                                </div>
+                                <?php if (!empty($task['details'])): ?>
+                                    <p class="text-xs text-gray-600 line-clamp-2 mb-2"><?= htmlspecialchars(substr($task['details'], 0, 100)) ?><?= strlen($task['details']) > 100 ? '...' : '' ?></p>
+                                <?php endif; ?>
+                            </div>
+                            <span class="px-2 py-1 text-xs rounded-full font-medium ml-2 <?= getStatusStyle($task['status']) ?>">
+                                <?= $task['status'] ?>
+                            </span>
                         </div>
-                        <div>
-                            <p class="text-2xl font-bold text-gray-900"><?= $userStats['completed'] ?></p>
-                            <p class="text-xs text-gray-500">Completed</p>
+                        
+                        <!-- Task Meta Info -->
+                        <div class="flex items-center justify-between text-xs text-gray-500 mb-3">
+                            <div class="flex items-center space-x-3">
+                                <span class="flex items-center">
+                                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3a2 2 0 012-2h4a2 2 0 012 2v4m-6 4l2 2 4-4"></path>
+                                    </svg>
+                                    <?= date('M j', strtotime($task['date'])) ?>
+                                </span>
+                                <?php if ($task['estimated_hours']): ?>
+                                    <span class="flex items-center">
+                                        <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                        </svg>
+                                        <?= $task['estimated_hours'] ?>h
+                                    </span>
+                                <?php endif; ?>
+                            </div>
+                            <span><?= timeAgo($task['created_at']) ?></span>
+                        </div>
+                        
+                        <!-- Quick Actions -->
+                        <div class="flex items-center justify-between">
+                            <div class="flex space-x-1">
+                                <?php if ($task['status'] === 'Pending'): ?>
+                                    <button onclick="event.stopPropagation(); updateTaskStatus(<?= $task['id'] ?>, 'On Progress')" 
+                                            class="px-3 py-1 bg-blue-500 text-white text-xs rounded-lg hover:bg-blue-600 transition-colors">
+                                        Start
+                                    </button>
+                                <?php elseif ($task['status'] === 'On Progress'): ?>
+                                    <button onclick="event.stopPropagation(); updateTaskStatus(<?= $task['id'] ?>, 'Done')" 
+                                            class="px-3 py-1 bg-green-500 text-white text-xs rounded-lg hover:bg-green-600 transition-colors">
+                                        Complete
+                                    </button>
+                                    <button onclick="event.stopPropagation(); updateTaskStatus(<?= $task['id'] ?>, 'On Hold')" 
+                                            class="px-2 py-1 bg-yellow-500 text-white text-xs rounded-lg hover:bg-yellow-600 transition-colors">
+                                        Hold
+                                    </button>
+                                <?php elseif ($task['status'] === 'On Hold'): ?>
+                                    <button onclick="event.stopPropagation(); updateTaskStatus(<?= $task['id'] ?>, 'On Progress')" 
+                                            class="px-3 py-1 bg-blue-500 text-white text-xs rounded-lg hover:bg-blue-600 transition-colors">
+                                        Resume
+                                    </button>
+                                <?php endif; ?>
+                            </div>
+                            
+                            <!-- View Detail Arrow -->
+                            <button onclick="openTaskDetail(<?= $task['id'] ?>)" class="p-1 rounded-lg hover:bg-gray-100 transition-colors">
+                                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                                </svg>
+                            </button>
                         </div>
                     </div>
-                </div>
-                <div class="bg-white rounded-xl p-4 shadow-sm">
-                    <div class="flex items-center space-x-3">
-                        <div class="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
-                            <svg class="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
-                        </div>
-                        <div>
-                            <p class="text-2xl font-bold text-gray-900"><?= $userStats['pending'] ?></p>
-                            <p class="text-xs text-gray-500">Pending</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Progress Chart -->
-            <div class="bg-white rounded-xl p-4 shadow-sm">
-                <h3 class="font-semibold text-gray-900 mb-4">Weekly Progress</h3>
-                <canvas id="progressChart" height="200"></canvas>
-            </div>
-
-        <?php elseif ($currentPage === 'profile'): ?>
-            <!-- Profile Page -->
-            <div class="bg-white rounded-xl p-6 shadow-sm text-center">
-                <div class="w-20 h-20 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <span class="text-white font-bold text-xl"><?= strtoupper(substr($_SESSION['user_name'], 0, 2)) ?></span>
-                </div>
-                <h2 class="text-lg font-bold text-gray-900 mb-1"><?= htmlspecialchars($_SESSION['user_name']) ?></h2>
-                <p class="text-sm text-gray-500 mb-4">Team Member</p>
-                
-                <div class="space-y-3">
-                    <a href="change-password.php" class="block w-full p-3 bg-gray-50 rounded-lg text-left">
-                        <div class="flex items-center space-x-3">
-                            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
-                            </svg>
-                            <span class="font-medium text-gray-900">Change Password</span>
-                        </div>
-                    </a>
-                    
-                    <button onclick="logout()" class="block w-full p-3 bg-red-50 rounded-lg text-left">
-                        <div class="flex items-center space-x-3">
-                            <svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
-                            </svg>
-                            <span class="font-medium text-red-900">Logout</span>
-                        </div>
-                    </button>
-                </div>
+                <?php endforeach; ?>
             </div>
         <?php endif; ?>
     </main>
 
+    <!-- Notifications Dropdown -->
+    <div id="notificationsDropdown" class="fixed top-16 right-4 w-80 max-w-sm bg-white rounded-2xl shadow-xl border border-gray-200 z-50 hidden">
+        <div class="p-4 border-b border-gray-100">
+            <div class="flex items-center justify-between">
+                <h3 class="font-semibold text-gray-900">Notifications</h3>
+                <button onclick="markAllAsRead()" class="text-xs text-blue-600 hover:text-blue-800">Mark all read</button>
+            </div>
+        </div>
+        <div class="max-h-80 overflow-y-auto">
+            <?php if (empty($notifications)): ?>
+                <div class="p-4 text-center">
+                    <p class="text-sm text-gray-500">No new notifications</p>
+                </div>
+            <?php else: ?>
+                <?php foreach ($notifications as $notification): ?>
+                    <div class="p-4 border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                        <div class="flex items-start space-x-3">
+                            <div class="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                            <div class="flex-1">
+                                <p class="text-sm font-medium text-gray-900"><?= htmlspecialchars($notification['title']) ?></p>
+                                <p class="text-xs text-gray-600 mt-1"><?= htmlspecialchars($notification['message']) ?></p>
+                                <p class="text-xs text-gray-400 mt-1"><?= timeAgo($notification['created_at']) ?></p>
+                            </div>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            <?php endif; ?>
+        </div>
+    </div>
+
     <!-- Bottom Navigation -->
     <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-2 glass-effect">
         <div class="flex justify-around">
-            <a href="?page=tasks" class="bottom-nav-item flex flex-col items-center space-y-1 p-2 <?= $currentPage === 'tasks' ? 'active' : '' ?>">
-                <div class="w-6 h-6 <?= $currentPage === 'tasks' ? 'text-blue-600' : 'text-gray-400' ?>">
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
-                    </svg>
-                </div>
-                <span class="text-xs font-medium <?= $currentPage === 'tasks' ? 'text-blue-600' : 'text-gray-400' ?>">Tasks</span>
+            <a href="?page=today" class="flex flex-col items-center space-y-1 p-2 <?= $currentPage === 'today' ? 'text-blue-600' : 'text-gray-400' ?> transition-colors">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3a2 2 0 012-2h4a2 2 0 012 2v4m-6 4l2 2 4-4"></path>
+                </svg>
+                <span class="text-xs font-medium">Today</span>
             </a>
             
-            <a href="?page=analytics" class="bottom-nav-item flex flex-col items-center space-y-1 p-2 <?= $currentPage === 'analytics' ? 'active' : '' ?>">
-                <div class="w-6 h-6 <?= $currentPage === 'analytics' ? 'text-blue-600' : 'text-gray-400' ?>">
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                    </svg>
-                </div>
-                <span class="text-xs font-medium <?= $currentPage === 'analytics' ? 'text-blue-600' : 'text-gray-400' ?>">Analytics</span>
+            <a href="?page=week" class="flex flex-col items-center space-y-1 p-2 <?= $currentPage === 'week' ? 'text-blue-600' : 'text-gray-400' ?> transition-colors">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3a2 2 0 012-2h4a2 2 0 012 2v4m-6 4l2 2 4-4"></path>
+                </svg>
+                <span class="text-xs font-medium">Week</span>
             </a>
             
-            <a href="?page=profile" class="bottom-nav-item flex flex-col items-center space-y-1 p-2 <?= $currentPage === 'profile' ? 'active' : '' ?>">
-                <div class="w-6 h-6 <?= $currentPage === 'profile' ? 'text-blue-600' : 'text-gray-400' ?>">
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                    </svg>
-                </div>
-                <span class="text-xs font-medium <?= $currentPage === 'profile' ? 'text-blue-600' : 'text-gray-400' ?>">Profile</span>
+            <a href="?page=all" class="flex flex-col items-center space-y-1 p-2 <?= $currentPage === 'all' ? 'text-blue-600' : 'text-gray-400' ?> transition-colors">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                </svg>
+                <span class="text-xs font-medium">All</span>
+            </a>
+            
+            <a href="profile.php" class="flex flex-col items-center space-y-1 p-2 text-gray-400 transition-colors">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                </svg>
+                <span class="text-xs font-medium">Profile</span>
             </a>
         </div>
     </nav>
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
+        // Global variables
+        let currentDate = new Date('<?= $selectedDate ?>');
+        
+        // Functions
         function refreshTasks() {
             location.reload();
-        }
-
-        function selectToday() {
-            const today = new Date().toISOString().split('T')[0];
-            changeDate(today);
-        }
-
-        function changeDate(date) {
-            window.location.href = `?page=tasks&date=${date}`;
         }
 
         function openTaskDetail(taskId) {
@@ -286,6 +354,12 @@ $userStats = getUserStats($_SESSION['user_id']);
 
         function updateTaskStatus(taskId, status) {
             if (!confirm(`Change status to "${status}"?`)) return;
+            
+            // Add loading state
+            const button = event.target;
+            const originalText = button.textContent;
+            button.textContent = '...';
+            button.disabled = true;
             
             fetch('api/tasks.php', {
                 method: 'POST',
@@ -299,80 +373,180 @@ $userStats = getUserStats($_SESSION['user_id']);
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    location.reload();
+                    // Show success feedback
+                    button.textContent = '✓';
+                    button.className = button.className.replace(/bg-\w+-500/, 'bg-green-500');
+                    
+                    // Reload after short delay
+                    setTimeout(() => location.reload(), 500);
                 } else {
-                    alert('Failed to update status');
+                    alert('Failed to update status: ' + (data.message || 'Unknown error'));
+                    button.textContent = originalText;
+                    button.disabled = false;
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
                 alert('Error updating status');
+                button.textContent = originalText;
+                button.disabled = false;
             });
         }
 
-        function logout() {
-            if (confirm('Are you sure you want to logout?')) {
-                window.location.href = 'login.php?logout=1';
+        function changeDate(days) {
+            currentDate.setDate(currentDate.getDate() + days);
+            const dateString = currentDate.toISOString().split('T')[0];
+            window.location.href = `?page=<?= $currentPage ?>&date=${dateString}`;
+        }
+
+        function jumpToDate(date) {
+            window.location.href = `?page=<?= $currentPage ?>&date=${date}`;
+        }
+
+        function showOtherDays() {
+            window.location.href = '?page=all';
+        }
+
+        function toggleNotifications() {
+            const dropdown = document.getElementById('notificationsDropdown');
+            dropdown.classList.toggle('hidden');
+            
+            // Close when clicking outside
+            if (!dropdown.classList.contains('hidden')) {
+                setTimeout(() => {
+                    document.addEventListener('click', function closeDropdown(e) {
+                        if (!dropdown.contains(e.target) && !e.target.closest('button[onclick="toggleNotifications()"]')) {
+                            dropdown.classList.add('hidden');
+                            document.removeEventListener('click', closeDropdown);
+                        }
+                    });
+                }, 100);
             }
         }
 
-        // Initialize progress chart if on analytics page
-        <?php if ($currentPage === 'analytics'): ?>
-        const ctx = document.getElementById('progressChart').getContext('2d');
-        const progressChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-                datasets: [{
-                    label: 'Completed Tasks',
-                    data: [3, 2, 5, 4, 6, 3, 2],
-                    borderColor: '#3B82F6',
-                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                    tension: 0.4,
-                    fill: true
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: {
-                    y: { beginAtZero: true, grid: { display: false } },
-                    x: { grid: { display: false } }
+        function markAllAsRead() {
+            fetch('api/notifications.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'mark_all_read' })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('notificationsDropdown').classList.add('hidden');
+                    location.reload();
+                }
+            });
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            // Left/Right arrows for date navigation
+            if (e.key === 'ArrowLeft' && e.ctrlKey) {
+                e.preventDefault();
+                changeDate(-1);
+            } else if (e.key === 'ArrowRight' && e.ctrlKey) {
+                e.preventDefault();
+                changeDate(1);
+            }
+            // R for refresh
+            else if (e.key === 'r' || e.key === 'R') {
+                if (!e.target.matches('input, textarea')) {
+                    e.preventDefault();
+                    refreshTasks();
                 }
             }
         });
-        <?php endif; ?>
 
-        // Auto-refresh every 30 seconds
+        // Pull to refresh (touch devices)
+        let startY = 0;
+        let pullDistance = 0;
+        
+        document.addEventListener('touchstart', function(e) {
+            startY = e.touches[0].clientY;
+        });
+        
+        document.addEventListener('touchmove', function(e) {
+            if (window.scrollY === 0) {
+                pullDistance = e.touches[0].clientY - startY;
+                if (pullDistance > 0) {
+                    e.preventDefault();
+                    // Visual feedback could be added here
+                }
+            }
+        });
+        
+        document.addEventListener('touchend', function(e) {
+            if (pullDistance > 100) {
+                refreshTasks();
+            }
+            pullDistance = 0;
+        });
+
+        // Auto-refresh every 2 minutes
         setInterval(() => {
             if (document.visibilityState === 'visible') {
                 location.reload();
             }
-        }, 30000);
+        }, 120000);
+
+        // Show loading state on navigation
+        document.querySelectorAll('a').forEach(link => {
+            link.addEventListener('click', function() {
+                if (this.href && !this.href.includes('#')) {
+                    this.style.opacity = '0.6';
+                }
+            });
+        });
     </script>
 </body>
 </html>
 
 <?php
-function getPageTitle($page) {
-    switch ($page) {
-        case 'tasks': return "Today's Tasks";
-        case 'analytics': return 'Analytics';
-        case 'profile': return 'Profile';
-        default: return 'Daily Calendar';
+// Helper functions
+function getStatusStyle($status) {
+    switch ($status) {
+        case 'Pending': return 'bg-yellow-100 text-yellow-700 border-yellow-200';
+        case 'On Progress': return 'bg-blue-100 text-blue-700 border-blue-200';
+        case 'Done': return 'bg-green-100 text-green-700 border-green-200';
+        case 'Approved': return 'bg-purple-100 text-purple-700 border-purple-200';
+        case 'On Hold': return 'bg-red-100 text-red-700 border-red-200';
+        default: return 'bg-gray-100 text-gray-700 border-gray-200';
     }
 }
 
-function getStatusStyle($status) {
-    switch ($status) {
-        case 'Pending': return 'bg-yellow-100 text-yellow-700';
-        case 'On Progress': return 'bg-blue-100 text-blue-700';
-        case 'Done': return 'bg-green-100 text-green-700';
-        case 'Approved': return 'bg-purple-100 text-purple-700';
-        case 'On Hold': return 'bg-red-100 text-red-700';
-        default: return 'bg-gray-100 text-gray-700';
-    }
+function getWeekTasks($userId) {
+    global $pdo;
+    
+    $stmt = $pdo->prepare("
+        SELECT t.*, u.name as assigned_name, c.name as created_name
+        FROM tasks t 
+        LEFT JOIN users u ON t.assigned_to = u.id 
+        LEFT JOIN users c ON t.created_by = c.id
+        WHERE t.assigned_to = ? 
+        AND t.date >= DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY)
+        AND t.date <= DATE_ADD(DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY), INTERVAL 6 DAY)
+        ORDER BY t.date ASC, 
+        CASE WHEN t.status = 'On Progress' THEN 1
+             WHEN t.status = 'Pending' THEN 2
+             WHEN t.status = 'Done' THEN 3
+             ELSE 4 END
+    ");
+    $stmt->execute([$userId]);
+    return $stmt->fetchAll();
+}
+
+function timeAgo($datetime) {
+    if (!$datetime) return 'Never';
+    
+    $time = time() - strtotime($datetime);
+    
+    if ($time < 60) return 'Just now';
+    if ($time < 3600) return floor($time/60) . 'm ago';
+    if ($time < 86400) return floor($time/3600) . 'h ago';
+    if ($time < 2592000) return floor($time/86400) . 'd ago';
+    
+    return date('M j', strtotime($datetime));
 }
 
 if (isset($_GET['logout'])) {

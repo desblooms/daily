@@ -729,13 +729,6 @@ function getStatusStyle($status) {
     }
 }
 
-function getAllUsers() {
-    global $pdo;
-    
-    $stmt = $pdo->query("SELECT * FROM users WHERE role != 'deleted' ORDER BY name");
-    return $stmt->fetchAll();
-}
-
 function getUserTaskCount($userId, $type) {
     global $pdo;
     
@@ -747,37 +740,6 @@ function getUserTaskCount($userId, $type) {
     
     $stmt->execute([$userId]);
     return $stmt->fetchColumn();
-}
-
-function getRecentActivities($limit = 20) {
-    global $pdo;
-    
-    $stmt = $pdo->prepare("
-        SELECT 
-            CONCAT(u.name, ' updated task \"', t.title, '\" to ', sl.status) as description,
-            sl.timestamp
-        FROM status_logs sl
-        JOIN users u ON sl.updated_by = u.id
-        JOIN tasks t ON sl.task_id = t.id
-        ORDER BY sl.timestamp DESC
-        LIMIT ?
-    ");
-    $stmt->execute([$limit]);
-    
-    return $stmt->fetchAll();
-}
-
-function timeAgo($datetime) {
-    if (!$datetime) return 'Never';
-    
-    $time = time() - strtotime($datetime);
-    
-    if ($time < 60) return 'Just now';
-    if ($time < 3600) return floor($time/60) . 'm ago';
-    if ($time < 86400) return floor($time/3600) . 'h ago';
-    if ($time < 2592000) return floor($time/86400) . 'd ago';
-    
-    return date('M j, Y', strtotime($datetime));
 }
 
 if (isset($_GET['logout'])) {
