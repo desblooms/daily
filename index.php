@@ -375,22 +375,6 @@ function getStatusStyle($status) {
     }
 }
 
-function getUserStats($userId) {
-    global $pdo;
-    
-    $stmt = $pdo->prepare("
-        SELECT 
-            SUM(CASE WHEN status IN ('Done', 'Approved') THEN 1 ELSE 0 END) as completed,
-            SUM(CASE WHEN status = 'Pending' THEN 1 ELSE 0 END) as pending,
-            SUM(CASE WHEN status = 'On Progress' THEN 1 ELSE 0 END) as in_progress
-        FROM tasks 
-        WHERE assigned_to = ? AND date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
-    ");
-    $stmt->execute([$userId]);
-    
-    return $stmt->fetch() ?: ['completed' => 0, 'pending' => 0, 'in_progress' => 0];
-}
-
 if (isset($_GET['logout'])) {
     logout();
 }
