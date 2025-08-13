@@ -879,10 +879,5 @@ function logPasswordChange($userId, $changeType = 'self', $changedBy = null) {
     ]);
 }
 
-/**
- * Helper function to check if current user is admin
- */
-function isAdmin() {
-    return isset($_SESSION['role']) && $_SESSION['role'] === 'admin';
-}
+// Note: isAdmin() function is already declared in auth.php
 ?>
