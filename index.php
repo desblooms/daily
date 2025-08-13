@@ -536,19 +536,6 @@ function getWeekTasks($userId) {
     return $stmt->fetchAll();
 }
 
-function timeAgo($datetime) {
-    if (!$datetime) return 'Never';
-    
-    $time = time() - strtotime($datetime);
-    
-    if ($time < 60) return 'Just now';
-    if ($time < 3600) return floor($time/60) . 'm ago';
-    if ($time < 86400) return floor($time/3600) . 'h ago';
-    if ($time < 2592000) return floor($time/86400) . 'd ago';
-    
-    return date('M j', strtotime($datetime));
-}
-
 if (isset($_GET['logout'])) {
     logout();
 }
