@@ -1,4 +1,4 @@
--- Enhanced Daily Calendar Database Schema
+-- Enhanced Daily Calendar Database Schema - FIXED VERSION
 -- Create database
 CREATE DATABASE IF NOT EXISTS u345095192_dailycalendar;
 USE u345095192_dailycalendar;
@@ -26,7 +26,7 @@ CREATE TABLE users (
     INDEX idx_active (is_active)
 );
 
--- Tasks table
+-- Tasks table with fixed structure
 CREATE TABLE tasks (
     id INT PRIMARY KEY AUTO_INCREMENT,
     title VARCHAR(200) NOT NULL,
@@ -35,6 +35,7 @@ CREATE TABLE tasks (
     assigned_to INT NOT NULL,
     created_by INT NOT NULL,
     approved_by INT NULL,
+    updated_by INT NULL,  -- ADDED: This was missing and causing trigger errors
     status ENUM('Pending','On Progress','Done','Approved','On Hold') DEFAULT 'Pending',
     priority ENUM('low','medium','high') DEFAULT 'medium',
     estimated_hours DECIMAL(4,2) NULL,
@@ -49,6 +50,7 @@ CREATE TABLE tasks (
     FOREIGN KEY (assigned_to) REFERENCES users(id) ON DELETE RESTRICT,
     FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE RESTRICT,
     FOREIGN KEY (approved_by) REFERENCES users(id) ON DELETE SET NULL,
+    FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL,
     
     INDEX idx_assigned_to (assigned_to),
     INDEX idx_date (date),
@@ -249,14 +251,14 @@ INSERT INTO users (name, email, password, role, department) VALUES
 ('Mike Johnson', 'mike@example.com', '$2y$10$VLXVfbJz/z.RR4L6dWNy5.YJY.1qI2Qp8Zq7Vr4V/DhA8b3FrKHjG', 'user', 'Marketing');
 
 -- Insert sample tasks
-INSERT INTO tasks (date, title, details, assigned_to, created_by, status, priority, estimated_hours) VALUES
-(CURDATE(), 'Design Landing Page Wireframes', 'Create wireframes for the new product landing page including mobile and desktop versions', 3, 1, 'Pending', 'high', 4.0),
-(CURDATE(), 'Implement User Authentication', 'Set up secure user authentication system with JWT tokens and password encryption', 2, 1, 'On Progress', 'high', 8.0),
-(CURDATE(), 'Content Strategy Meeting', 'Quarterly content strategy review and planning session with marketing team', 4, 1, 'Pending', 'medium', 2.0),
-(CURDATE(), 'Database Optimization', 'Optimize database queries and add proper indexing for better performance', 2, 1, 'Done', 'medium', 6.0),
-(DATE_ADD(CURDATE(), INTERVAL 1 DAY), 'User Testing Session', 'Conduct user testing for the new dashboard interface', 3, 1, 'Pending', 'medium', 3.0),
-(DATE_ADD(CURDATE(), INTERVAL 1 DAY), 'API Documentation', 'Update API documentation with new endpoints and examples', 2, 1, 'Pending', 'low', 4.0),
-(DATE_ADD(CURDATE(), INTERVAL 2 DAY), 'Social Media Campaign', 'Launch social media campaign for product announcement', 4, 1, 'Pending', 'high', 5.0);
+INSERT INTO tasks (date, title, details, assigned_to, created_by, updated_by, status, priority, estimated_hours) VALUES
+(CURDATE(), 'Design Landing Page Wireframes', 'Create wireframes for the new product landing page including mobile and desktop versions', 3, 1, 1, 'Pending', 'high', 4.0),
+(CURDATE(), 'Implement User Authentication', 'Set up secure user authentication system with JWT tokens and password encryption', 2, 1, 1, 'On Progress', 'high', 8.0),
+(CURDATE(), 'Content Strategy Meeting', 'Quarterly content strategy review and planning session with marketing team', 4, 1, 1, 'Pending', 'medium', 2.0),
+(CURDATE(), 'Database Optimization', 'Optimize database queries and add proper indexing for better performance', 2, 1, 1, 'Done', 'medium', 6.0),
+(DATE_ADD(CURDATE(), INTERVAL 1 DAY), 'User Testing Session', 'Conduct user testing for the new dashboard interface', 3, 1, 1, 'Pending', 'medium', 3.0),
+(DATE_ADD(CURDATE(), INTERVAL 1 DAY), 'API Documentation', 'Update API documentation with new endpoints and examples', 2, 1, 1, 'Pending', 'low', 4.0),
+(DATE_ADD(CURDATE(), INTERVAL 2 DAY), 'Social Media Campaign', 'Launch social media campaign for product announcement', 4, 1, 1, 'Pending', 'high', 5.0);
 
 -- Insert sample status logs
 INSERT INTO status_logs (task_id, status, updated_by, comments) VALUES
@@ -340,19 +342,20 @@ CREATE INDEX idx_status_logs_recent ON status_logs(timestamp DESC, task_id);
 CREATE INDEX idx_activity_logs_recent ON activity_logs(timestamp DESC, user_id);
 CREATE INDEX idx_notifications_unread ON notifications(user_id, is_read, created_at DESC);
 
--- Create triggers for automatic logging
+-- FIXED TRIGGERS (No syntax errors)
 DELIMITER //
 
 CREATE TRIGGER task_status_change_trigger
 AFTER UPDATE ON tasks
 FOR EACH ROW
 BEGIN
+    -- Only log if status actually changed
     IF OLD.status != NEW.status THEN
         INSERT INTO status_logs (task_id, status, previous_status, updated_by, timestamp)
         VALUES (NEW.id, NEW.status, OLD.status, NEW.updated_by, NOW());
         
-        -- Create notification for assigned user if status changed by admin
-        IF NEW.assigned_to != NEW.updated_by THEN
+        -- Create notification for assigned user if status changed by someone else
+        IF NEW.assigned_to != COALESCE(NEW.updated_by, NEW.assigned_to) THEN
             INSERT INTO notifications (user_id, title, message, type, related_type, related_id)
             VALUES (
                 NEW.assigned_to,
@@ -370,6 +373,7 @@ CREATE TRIGGER task_assignment_trigger
 AFTER UPDATE ON tasks
 FOR EACH ROW
 BEGIN
+    -- Only trigger if assignment changed
     IF OLD.assigned_to != NEW.assigned_to THEN
         -- Notify new assignee
         INSERT INTO notifications (user_id, title, message, type, related_type, related_id)
@@ -384,10 +388,29 @@ BEGIN
     END IF;
 END//
 
-DELIMITER ;
+CREATE TRIGGER new_task_trigger
+AFTER INSERT ON tasks
+FOR EACH ROW
+BEGIN
+    -- Log initial status
+    INSERT INTO status_logs (task_id, status, updated_by, timestamp)
+    VALUES (NEW.id, NEW.status, NEW.created_by, NOW());
+    
+    -- Notify assigned user if different from creator
+    IF NEW.assigned_to != NEW.created_by THEN
+        INSERT INTO notifications (user_id, title, message, type, related_type, related_id)
+        VALUES (
+            NEW.assigned_to,
+            CONCAT('New Task Assigned: ', NEW.title),
+            CONCAT('You have been assigned a new task for ', NEW.date),
+            'info',
+            'task',
+            NEW.id
+        );
+    END IF;
+END//
 
--- Grant privileges (adjust as needed for your environment)
--- GRANT SELECT, INSERT, UPDATE, DELETE ON u345095192_dailycalendar.* TO 'u345095192_dailycalendar'@'localhost';
+DELIMITER ;
 
 -- Final optimization
 ANALYZE TABLE users, tasks, status_logs, activity_logs, notifications;
