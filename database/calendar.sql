@@ -414,3 +414,41 @@ DELIMITER ;
 
 -- Final optimization
 ANALYZE TABLE users, tasks, status_logs, activity_logs, notifications;
+
+
+
+
+-- Add password reset table to existing schema
+CREATE TABLE password_reset_tokens (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    email VARCHAR(150) NOT NULL,
+    token VARCHAR(255) NOT NULL UNIQUE,
+    expires_at TIMESTAMP NOT NULL,
+    used BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    used_at TIMESTAMP NULL,
+    ip_address VARCHAR(45) NULL,
+    
+    INDEX idx_email (email),
+    INDEX idx_token (token),
+    INDEX idx_expires (expires_at),
+    INDEX idx_used (used)
+);
+
+-- Add rate limiting table for password reset requests
+CREATE TABLE password_reset_attempts (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    email VARCHAR(150) NOT NULL,
+    ip_address VARCHAR(45) NOT NULL,
+    attempt_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    INDEX idx_email_time (email, attempt_time),
+    INDEX idx_ip_time (ip_address, attempt_time)
+);
+
+-- Clean up expired tokens (run as scheduled job)
+CREATE EVENT IF NOT EXISTS cleanup_expired_reset_tokens
+ON SCHEDULE EVERY 1 HOUR
+DO
+  DELETE FROM password_reset_tokens 
+  WHERE expires_at < NOW() - INTERVAL 24 HOUR;

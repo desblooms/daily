@@ -53,6 +53,28 @@ $recentActivities = getRecentActivities(20);
             .sidebar { transform: translateX(-100%); }
             .sidebar.open { transform: translateX(0); }
         }
+
+/* Fixed chart container heights */
+        .chart-container {
+            position: relative;
+            height: 300px !important;
+            width: 100%;
+        }
+        
+        .chart-container canvas {
+            max-height: 300px !important;
+        }
+        
+        @media (max-width: 768px) {
+            .sidebar { transform: translateX(-100%); }
+            .sidebar.open { transform: translateX(0); }
+            .chart-container {
+                height: 250px !important;
+            }
+            .chart-container canvas {
+                max-height: 250px !important;
+            }
+        }
     </style>
 </head>
 <body class="bg-gray-50">
@@ -431,14 +453,18 @@ $recentActivities = getRecentActivities(20);
                         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                             <div class="bg-white rounded-2xl p-6 shadow-sm border">
                                 <h3 class="text-lg font-semibold text-gray-900 mb-4">Performance Metrics</h3>
+                                  <div class="chart-container">
                                 <canvas id="performanceChart" height="200"></canvas>
+                  
                             </div>
-                            
+                            </div>
                             <div class="bg-white rounded-2xl p-6 shadow-sm border">
                                 <h3 class="text-lg font-semibold text-gray-900 mb-4">Team Productivity</h3>
+                                <div class="chart-container">
                                 <canvas id="productivityChart" height="200"></canvas>
+                                  </div>
                             </div>
-                        </div>
+                        
 
                     <?php elseif ($currentView === 'users'): ?>
                         <!-- Users Management View -->
@@ -592,7 +618,7 @@ $recentActivities = getRecentActivities(20);
             },
             options: {
                 responsive: true,
-                maintainAspectRatio: false,
+                maintainAspectRatio: true,
                 plugins: {
                     legend: {
                         position: 'bottom',
