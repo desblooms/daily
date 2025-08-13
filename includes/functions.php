@@ -212,8 +212,8 @@ function getAnalytics($date = null, $userId = null) {
             t.status,
             COUNT(*) as count,
             AVG(t.actual_hours) as avg_hours,
-            SUM(CASE WHEN t.priority = 'high' THEN 1 ELSE 0 END) as high_priority,
-            SUM(CASE WHEN t.date < CURDATE() AND t.status NOT IN ('Done', 'Approved') THEN 1 ELSE 0 END) as overdue
+            SUM(CASE WHEN t.priority = 'high' THEN 1 ELSE 0 END) as high_priority_count,
+            SUM(CASE WHEN t.date < CURDATE() AND t.status NOT IN ('Done', 'Approved') THEN 1 ELSE 0 END) as overdue_count
         FROM tasks t 
         LEFT JOIN users u ON t.assigned_to = u.id
         WHERE u.is_active = TRUE {$dateFilter} {$userFilter}
@@ -237,8 +237,8 @@ function getAnalytics($date = null, $userId = null) {
     foreach ($results as $row) {
         $analytics[$row['status']] = (int)$row['count'];
         $analytics['total'] += (int)$row['count'];
-        $analytics['overdue'] += (int)$row['overdue'];
-        $analytics['high_priority'] += (int)$row['high_priority'];
+        $analytics['overdue'] += (int)$row['overdue_count'];
+        $analytics['high_priority'] += (int)$row['high_priority_count'];
         if ($row['avg_hours']) {
             $analytics['avg_completion_time'] = round($row['avg_hours'], 2);
         }
@@ -269,6 +269,89 @@ function getWeeklyAnalytics($userId = null) {
     $stmt->execute($params);
     
     return $stmt->fetchAll();
+}
+
+function getProductivityMetrics($userId = null, $days = 30) {
+    global $pdo;
+    
+    $userFilter = $userId ? "AND t.assigned_to = ?" : "";
+    $params = [$days];
+    if ($userId) $params[] = $userId;
+    
+    $stmt = $pdo->prepare("
+        SELECT 
+            COUNT(*) as total_tasks,
+            SUM(CASE WHEN t.status IN ('Done', 'Approved') THEN 1 ELSE 0 END) as completed_tasks,
+            AVG(CASE WHEN t.status IN ('Done', 'Approved') THEN t.actual_hours END) as avg_completion_time,
+            SUM(CASE WHEN t.date < CURDATE() AND t.status NOT IN ('Done', 'Approved') THEN 1 ELSE 0 END) as overdue_tasks,
+            COUNT(DISTINCT t.assigned_to) as active_users
+        FROM tasks t
+        LEFT JOIN users u ON t.assigned_to = u.id
+        WHERE u.is_active = TRUE 
+        AND t.date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
+        {$userFilter}
+    ");
+    $stmt->execute($params);
+    
+    $metrics = $stmt->fetch();
+    
+    if ($metrics['total_tasks'] > 0) {
+        $metrics['completion_rate'] = round(($metrics['completed_tasks'] / $metrics['total_tasks']) * 100, 2);
+    } else {
+        $metrics['completion_rate'] = 0;
+    }
+    
+    return $metrics;
+}
+
+function getAnalytics($date = null, $userId = null) {
+    global $pdo;
+    
+    $dateFilter = $date ? "AND t.date = ?" : "AND t.date = CURDATE()";
+    $userFilter = $userId ? "AND t.assigned_to = ?" : "";
+    
+    $params = [];
+    if ($date) $params[] = $date;
+    if ($userId) $params[] = $userId;
+    
+    $stmt = $pdo->prepare("
+        SELECT 
+            t.status,
+            COUNT(*) as count,
+            AVG(t.actual_hours) as avg_hours,
+            SUM(CASE WHEN t.priority = 'high' THEN 1 ELSE 0 END) as high_priority_count,
+            SUM(CASE WHEN t.date < CURDATE() AND t.status NOT IN ('Done', 'Approved') THEN 1 ELSE 0 END) as overdue_count
+        FROM tasks t 
+        LEFT JOIN users u ON t.assigned_to = u.id
+        WHERE u.is_active = TRUE {$dateFilter} {$userFilter}
+        GROUP BY t.status
+    ");
+    $stmt->execute($params);
+    
+    $results = $stmt->fetchAll();
+    $analytics = [
+        'Pending' => 0,
+        'On Progress' => 0,
+        'Done' => 0,
+        'Approved' => 0,
+        'On Hold' => 0,
+        'total' => 0,
+        'overdue' => 0,
+        'high_priority' => 0,
+        'avg_completion_time' => 0
+    ];
+    
+    foreach ($results as $row) {
+        $analytics[$row['status']] = (int)$row['count'];
+        $analytics['total'] += (int)$row['count'];
+        $analytics['overdue'] += (int)$row['overdue_count'];
+        $analytics['high_priority'] += (int)$row['high_priority_count'];
+        if ($row['avg_hours']) {
+            $analytics['avg_completion_time'] = round($row['avg_hours'], 2);
+        }
+    }
+    
+    return $analytics;
 }
 
 function getProductivityMetrics($userId = null, $days = 30) {
