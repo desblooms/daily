@@ -1,13 +1,9 @@
 <?php
-// Ensure JSON responses only
-ini_set('display_errors', 0);
-error_reporting(0);
+// Users API - Clean version
+header('Content-Type: application/json');
+header('Cache-Control: no-cache, must-revalidate');
 
 try {
-    // Set JSON header first
-    header('Content-Type: application/json');
-    header('Cache-Control: no-cache, must-revalidate');
-    
     // Start session if not already started
     if (session_status() === PHP_SESSION_NONE) {
         session_start();
@@ -16,7 +12,6 @@ try {
     // Include required files
     require_once '../includes/db.php';
     require_once '../includes/auth.php';
-    require_once '../includes/functions.php';
     
     // Check if user is logged in
     if (!isset($_SESSION['user_id']) || !isset($_SESSION['role'])) {
@@ -27,6 +22,7 @@ try {
     
     // Verify database connection
     if (!isset($pdo) || !$pdo) {
+        http_response_code(500);
         echo json_encode(['success' => false, 'message' => 'Database connection failed']);
         exit;
     }
@@ -59,17 +55,11 @@ try {
     }
     
 } catch (Exception $e) {
+    http_response_code(500);
     error_log("Users API Error: " . $e->getMessage());
     echo json_encode([
         'success' => false, 
         'message' => 'Internal server error',
-        'debug' => $e->getMessage()
-    ]);
-} catch (Error $e) {
-    error_log("Users API Fatal Error: " . $e->getMessage());
-    echo json_encode([
-        'success' => false, 
-        'message' => 'System error',
         'debug' => $e->getMessage()
     ]);
 }
@@ -105,15 +95,9 @@ function getActiveUsers($pdo) {
                 u.department, 
                 u.avatar, 
                 u.last_login,
-                u.created_at,
-                COUNT(t.id) as total_tasks,
-                COUNT(CASE WHEN t.status = 'Done' THEN 1 END) as completed_tasks,
-                COUNT(CASE WHEN t.status = 'On Progress' THEN 1 END) as active_tasks,
-                COUNT(CASE WHEN t.status = 'Pending' THEN 1 END) as pending_tasks
+                u.created_at
             FROM users u
-            LEFT JOIN tasks t ON u.id = t.assigned_to
             WHERE u.is_active = TRUE
-            GROUP BY u.id
             ORDER BY u.role DESC, u.name ASC
         ");
         $stmt->execute();
@@ -155,15 +139,9 @@ function getUserProfile($pdo) {
                 u.avatar, 
                 u.phone,
                 u.last_login,
-                u.created_at,
-                COUNT(t.id) as total_tasks,
-                COUNT(CASE WHEN t.status = 'Done' THEN 1 END) as completed_tasks,
-                COUNT(CASE WHEN t.status = 'On Progress' THEN 1 END) as active_tasks,
-                AVG(CASE WHEN t.status = 'Done' AND t.actual_hours IS NOT NULL THEN t.actual_hours END) as avg_completion_time
+                u.created_at
             FROM users u
-            LEFT JOIN tasks t ON u.id = t.assigned_to
             WHERE u.id = ? AND u.is_active = TRUE
-            GROUP BY u.id
         ");
         $stmt->execute([$userId]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -173,28 +151,9 @@ function getUserProfile($pdo) {
             return;
         }
         
-        // Get recent activities
-        $stmt = $pdo->prepare("
-            SELECT 
-                al.action,
-                al.resource_type,
-                al.resource_id,
-                al.details,
-                al.created_at,
-                t.title as task_title
-            FROM activity_logs al
-            LEFT JOIN tasks t ON al.resource_id = t.id AND al.resource_type = 'task'
-            WHERE al.user_id = ?
-            ORDER BY al.created_at DESC
-            LIMIT 10
-        ");
-        $stmt->execute([$userId]);
-        $activities = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
         echo json_encode([
             'success' => true,
-            'user' => $user,
-            'recent_activities' => $activities
+            'user' => $user
         ]);
         
     } catch (Exception $e) {
@@ -237,7 +196,7 @@ function updateUserProfile($pdo) {
         foreach ($allowedFields as $field) {
             if (isset($input[$field]) && $input[$field] !== null) {
                 $updates[] = "{$field} = ?";
-                $params[] = trim($input[$field]); // Simple sanitization
+                $params[] = trim($input[$field]);
             }
         }
         
@@ -258,11 +217,6 @@ function updateUserProfile($pdo) {
         if ($stmt->rowCount() === 0) {
             echo json_encode(['success' => false, 'message' => 'No changes made or user not found']);
             return;
-        }
-        
-        // Log activity if function exists
-        if (function_exists('logActivity')) {
-            logActivity($_SESSION['user_id'], 'profile_updated', 'user', $userId);
         }
         
         echo json_encode(['success' => true, 'message' => 'Profile updated successfully']);
@@ -290,13 +244,8 @@ function getUserTasks($pdo) {
         }
         
         $sql = "
-            SELECT 
-                t.*,
-                c.name as created_by_name,
-                a.name as approved_by_name
+            SELECT t.*
             FROM tasks t
-            LEFT JOIN users c ON t.created_by = c.id
-            LEFT JOIN users a ON t.approved_by = a.id
             WHERE t.assigned_to = ?
         ";
         
@@ -347,30 +296,16 @@ function getUserStats($pdo) {
                 COUNT(CASE WHEN status = 'Done' THEN 1 END) as completed_tasks,
                 COUNT(CASE WHEN status = 'On Progress' THEN 1 END) as active_tasks,
                 COUNT(CASE WHEN status = 'Pending' THEN 1 END) as pending_tasks,
-                COUNT(CASE WHEN status = 'On Hold' THEN 1 END) as on_hold_tasks,
-                AVG(CASE WHEN status = 'Done' AND actual_hours IS NOT NULL THEN actual_hours END) as avg_completion_time,
-                AVG(CASE WHEN status = 'Done' AND estimated_hours IS NOT NULL AND actual_hours IS NOT NULL 
-                    THEN (actual_hours / estimated_hours) * 100 END) as avg_accuracy_percentage
+                COUNT(CASE WHEN status = 'On Hold' THEN 1 END) as on_hold_tasks
             FROM tasks 
             WHERE assigned_to = ?
         ");
         $stmt->execute([$userId]);
         $stats = $stmt->fetch(PDO::FETCH_ASSOC);
         
-        // Get this week's tasks
-        $stmt = $pdo->prepare("
-            SELECT COUNT(*) as this_week_tasks
-            FROM tasks 
-            WHERE assigned_to = ? 
-            AND date >= DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY)
-            AND date < DATE_ADD(DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY), INTERVAL 7 DAY)
-        ");
-        $stmt->execute([$userId]);
-        $weekStats = $stmt->fetch(PDO::FETCH_ASSOC);
-        
         echo json_encode([
             'success' => true,
-            'stats' => array_merge($stats, $weekStats)
+            'stats' => $stats
         ]);
         
     } catch (Exception $e) {
