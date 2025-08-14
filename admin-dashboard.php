@@ -40,6 +40,9 @@ $recentActivities = getRecentActivities(20);
             }
         }
     </script>
+<script src="assets/js/global-task-manager.js"></script>
+
+
     <style>
         .sidebar-hidden { transform: translateX(-100%); }
         .clickup-gradient { background: linear-gradient(135deg, #7B68EE 0%, #9F7AEA 100%); }
@@ -284,9 +287,11 @@ $recentActivities = getRecentActivities(20);
                                 <div class="p-6 border-b border-gray-200">
                                     <div class="flex items-center justify-between">
                                         <h3 class="text-lg font-semibold text-gray-900">Today's Tasks</h3>
-                                        <button class="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors text-sm">
+                                        <button onclick="globalTaskManager.openAddTaskModal()" class="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors text-sm">
                                             + Add Task
                                         </button>
+
+                                 
                                     </div>
                                 </div>
                                 <div class="max-h-96 overflow-y-auto">
@@ -379,7 +384,7 @@ $recentActivities = getRecentActivities(20);
                                             <option>Approved</option>
                                             <option>On Hold</option>
                                         </select>
-                                        <button class="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors">
+                                        <button onclick="globalTaskManager.openAddTaskModal()" class="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors">
                                             + Add Task
                                         </button>
                                     </div>
