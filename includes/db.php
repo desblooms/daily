@@ -10,9 +10,9 @@ class Database {
     public function connect() {
         if ($this->conn === null) {
             try {
-                // Add error reporting for debugging
-                error_reporting(E_ALL);
-                ini_set('display_errors', 1);
+                // Disable error display to prevent HTML output in API responses
+                ini_set('display_errors', 0);
+                error_reporting(0);
                 
                 $this->conn = new PDO(
                     "mysql:host={$this->host};dbname={$this->dbname};charset=utf8mb4",
@@ -29,11 +29,11 @@ class Database {
                 $this->conn->query("SELECT 1");
                 
             } catch (PDOException $e) {
-                // Log the error instead of displaying it in production
+                // Log the error instead of displaying it
                 error_log("Database connection failed: " . $e->getMessage());
                 
-                // For debugging, you can temporarily show the error
-                die("Database connection failed. Check error logs.");
+                // Throw exception to be caught by API handlers
+                throw new Exception("Database connection failed: " . $e->getMessage());
             }
         }
         return $this->conn;

@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Fix Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .result { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .success { background-color: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+        .error { background-color: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+        .info { background-color: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }
+        pre { background: #f8f9fa; padding: 10px; border: 1px solid #dee2e6; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <h1>API Fix Test</h1>
+    <div id="results"></div>
+
+    <script>
+        // Simulate session variables
+        window.userRole = 'admin';
+        window.userId = 1;
+        window.userName = 'Test User';
+        
+        async function testAPI() {
+            const results = document.getElementById('results');
+            
+            function addResult(type, title, message) {
+                const div = document.createElement('div');
+                div.className = `result ${type}`;
+                div.innerHTML = `<strong>${title}</strong><br>${message}`;
+                results.appendChild(div);
+            }
+            
+            addResult('info', 'Testing API Fix', 'First setting up test session, then testing API...');
+            
+            // First, set up a test session
+            try {
+                const sessionResponse = await fetch('setup-test-session.php', {
+                    credentials: 'same-origin'
+                });
+                if (sessionResponse.ok) {
+                    const sessionData = await sessionResponse.json();
+                    addResult('success', 'Session Setup', `Test session created: ${sessionData.message}`);
+                } else {
+                    addResult('warning', 'Session Setup', 'Could not set up test session, but continuing...');
+                }
+            } catch (error) {
+                addResult('warning', 'Session Setup', 'Could not set up test session: ' + error.message);
+            }
+            
+            try {
+                console.log('🧪 Testing users API...');
+                
+                // First try the simplified API
+                addResult('info', 'Testing Simplified API', 'Trying simplified users API first...');
+                
+                let response = await fetch('api/users-simple.php', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Cache-Control': 'no-cache'
+                    },
+                    credentials: 'same-origin'
+                });
+                
+                addResult('info', 'Simple API Response', `HTTP ${response.status}: ${response.statusText}`);
+                
+                if (response.ok) {
+                    const responseText = await response.text();
+                    addResult('success', 'Simple API Success', `<pre>${responseText}</pre>`);
+                    
+                    try {
+                        const data = JSON.parse(responseText);
+                        if (data.success && data.users) {
+                            addResult('success', 'Simple API Users', `Found ${data.users.length} users in simplified API`);
+                            testDropdownCreation(data.users);
+                            return; // Exit if simple API works
+                        }
+                    } catch (e) {
+                        addResult('error', 'Simple API Parse Error', e.message);
+                    }
+                }
+                
+                // If simple API fails, try the original
+                addResult('info', 'Testing Original API', 'Now trying original users API...');
+                
+                response = await fetch('api/users.php?action=get_active_users', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Cache-Control': 'no-cache'
+                    },
+                    credentials: 'same-origin'
+                });
+                
+                addResult('info', 'Response Status', `HTTP ${response.status}: ${response.statusText}`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const responseText = await response.text();
+                
+                addResult('info', 'Raw Response', `<pre>${responseText}</pre>`);
+                
+                // Check if response is HTML (error page)
+                if (responseText.trim().startsWith('<')) {
+                    addResult('error', 'HTML Response Detected', 'Server returned HTML instead of JSON. The fix may not have worked or there are other issues.');
+                    return;
+                }
+                
+                // Try to parse JSON
+                let data;
+                try {
+                    data = JSON.parse(responseText);
+                    addResult('success', 'JSON Parse Success', 'Response successfully parsed as JSON');
+                } catch (parseError) {
+                    addResult('error', 'JSON Parse Error', `Failed to parse JSON: ${parseError.message}`);
+                    return;
+                }
+                
+                if (data.success) {
+                    addResult('success', 'API Success', `Loaded ${data.users ? data.users.length : 0} users successfully`);
+                    
+                    if (data.users && data.users.length > 0) {
+                        let userList = '<ul>';
+                        data.users.forEach(user => {
+                            userList += `<li>ID: ${user.id} - ${user.name} (${user.email}) - ${user.role}</li>`;
+                        });
+                        userList += '</ul>';
+                        addResult('info', 'Users List', userList);
+                        
+                        // Test dropdown creation
+                        testDropdownCreation(data.users);
+                    } else {
+                        addResult('error', 'No Users Found', 'No users found in database. You need to run create-sample-users.php to add users to the database.');
+                    }
+                } else {
+                    addResult('error', 'API Error', data.message || 'API returned success: false');
+                    
+                    if (data.debug) {
+                        addResult('info', 'Debug Info', data.debug);
+                    }
+                }
+                
+            } catch (error) {
+                console.error('❌ Test failed:', error);
+                addResult('error', 'Test Failed', error.message);
+            }
+        }
+        
+        function testDropdownCreation(users) {
+            const results = document.getElementById('results');
+            
+            function addResult(type, title, message) {
+                const div = document.createElement('div');
+                div.className = `result ${type}`;
+                div.innerHTML = `<strong>${title}</strong><br>${message}`;
+                results.appendChild(div);
+            }
+            
+            // Create a test dropdown like the GlobalTaskManager does
+            const userOptions = users.map(user => 
+                `<option value="${user.id}">${user.name} (${user.department || 'No Dept'})</option>`
+            ).join('');
+            
+            const testDropdown = `
+                <select class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                    <option value="">Select user...</option>
+                    ${userOptions}
+                </select>
+            `;
+            
+            addResult('success', 'Dropdown Test', `Dropdown created successfully with ${users.length} user options:<br>${testDropdown}`);
+        }
+        
+        // Run test when page loads
+        document.addEventListener('DOMContentLoaded', testAPI);
+    </script>
+</body>
+</html>
