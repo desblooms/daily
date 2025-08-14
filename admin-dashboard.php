@@ -81,6 +81,10 @@ $recentActivities = getRecentActivities(20);
     </style>
 </head>
 <body class="bg-gray-50">
+    <?php 
+    // Include the global header AFTER the scripts are loaded
+    include 'includes/global-header.php'; 
+    ?>
     <!-- Mobile Header -->
     <div class="md:hidden bg-white shadow-sm border-b">
         <div class="flex items-center justify-between p-4">
