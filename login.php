@@ -116,6 +116,13 @@ $maxLoginAttempts = getSystemSetting('max_login_attempts', 5);
             transition: all 0.2s ease;
         }
     </style>
+
+    <script>
+    // Provide user context to JavaScript
+    window.userRole = '<?= $_SESSION['role'] ?? 'user' ?>';
+    window.userId = <?= $_SESSION['user_id'] ?? 'null' ?>;
+    window.userName = '<?= htmlspecialchars($_SESSION['user_name'] ?? 'Unknown') ?>';
+</script>
 </head>
 <body class="login-bg flex items-center justify-center p-4">
     <!-- Background decorative elements -->

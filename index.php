@@ -34,6 +34,8 @@ $notifications = getUserNotifications($_SESSION['user_id'], true, 5);
 <!DOCTYPE html>
 <html lang="en">
 <head>
+
+
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= $pageTitle ?> - Daily Calendar</title>
@@ -83,6 +85,12 @@ $notifications = getUserNotifications($_SESSION['user_id'], true, 5);
             50% { opacity: 0.5; }
         }
     </style>
+    <script>
+    // Provide user context to JavaScript
+    window.userRole = '<?= $_SESSION['role'] ?? 'user' ?>';
+    window.userId = <?= $_SESSION['user_id'] ?? 'null' ?>;
+    window.userName = '<?= htmlspecialchars($_SESSION['user_name'] ?? 'Unknown') ?>';
+</script>
 </head>
 <body class="bg-gray-50 min-h-screen pb-20">
     <!-- Header with Glass Effect -->

@@ -22,7 +22,7 @@ $recentActivities = getRecentActivities(20);
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard - Daily Calendar</title>
-   <script src="https://cdn.tailwindcss.com/3.4.0"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         tailwind.config = {
@@ -79,6 +79,13 @@ $recentActivities = getRecentActivities(20);
             }
         }
     </style>
+
+    <script>
+    // Provide user context to JavaScript
+    window.userRole = '<?= $_SESSION['role'] ?? 'user' ?>';
+    window.userId = <?= $_SESSION['user_id'] ?? 'null' ?>;
+    window.userName = '<?= htmlspecialchars($_SESSION['user_name'] ?? 'Unknown') ?>';
+</script>
 </head>
 <body class="bg-gray-50">
     <?php 
