@@ -1,65 +1,116 @@
 <?php
-require_once '../includes/db.php';
-require_once '../includes/auth.php';
-require_once '../includes/functions.php';
+// Prevent any HTML output and ensure JSON responses
+ini_set('display_errors', 0);
+error_reporting(0);
 
-header('Content-Type: application/json');
-requireLogin();
-
-$action = $_GET['action'] ?? $_POST['action'] ?? '';
+// Start output buffering to catch any unexpected output
+ob_start();
 
 try {
+    // Set JSON header first
+    header('Content-Type: application/json');
+    header('Cache-Control: no-cache, must-revalidate');
+    
+    // Start session if not already started
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+    
+    // Include required files
+    require_once '../includes/db.php';
+    require_once '../includes/functions.php';
+    
+    // Check if user is logged in
+    if (!isset($_SESSION['user_id']) || !isset($_SESSION['role'])) {
+        // Clean any output buffer
+        ob_clean();
+        http_response_code(401);
+        echo json_encode(['success' => false, 'message' => 'Authentication required']);
+        exit;
+    }
+    
+    // Verify database connection
+    if (!isset($pdo) || !$pdo) {
+        ob_clean();
+        echo json_encode(['success' => false, 'message' => 'Database connection failed']);
+        exit;
+    }
+    
+    $action = $_GET['action'] ?? $_POST['action'] ?? '';
+    
+    // Clean output buffer before processing
+    ob_clean();
+    
     switch ($action) {
         case 'get_active_users':
-            getActiveUsers();
+            getActiveUsers($pdo);
             break;
             
         case 'get_user_profile':
-            getUserProfile();
+            getUserProfile($pdo);
             break;
             
         case 'update_profile':
-            updateUserProfile();
+            updateUserProfile($pdo);
             break;
             
         case 'get_user_tasks':
-            getUserTasks();
+            getUserTasks($pdo);
             break;
             
         case 'get_user_stats':
-            getUserStats();
+            getUserStats($pdo);
             break;
             
         default:
             echo json_encode(['success' => false, 'message' => 'Invalid action']);
     }
+    
 } catch (Exception $e) {
-    echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+    // Clean any output buffer
+    ob_clean();
+    error_log("Users API Error: " . $e->getMessage());
+    echo json_encode([
+        'success' => false, 
+        'message' => 'Internal server error',
+        'debug' => $e->getMessage() // Remove in production
+    ]);
+} catch (Error $e) {
+    // Clean any output buffer
+    ob_clean();
+    error_log("Users API Fatal Error: " . $e->getMessage());
+    echo json_encode([
+        'success' => false, 
+        'message' => 'System error',
+        'debug' => $e->getMessage() // Remove in production
+    ]);
+} finally {
+    // End output buffering
+    ob_end_flush();
 }
 
-function getActiveUsers() {
-    global $pdo;
-    
-    // Only admin can get all users, regular users can only see themselves
-    if ($_SESSION['role'] !== 'admin') {
-        // Return only current user for non-admin
-        $stmt = $pdo->prepare("
-            SELECT id, name, email, role, department, avatar, last_login 
-            FROM users 
-            WHERE id = ? AND is_active = TRUE
-        ");
-        $stmt->execute([$_SESSION['user_id']]);
-        $user = $stmt->fetch();
-        
-        echo json_encode([
-            'success' => true,
-            'users' => $user ? [$user] : [],
-            'count' => $user ? 1 : 0
-        ]);
-        return;
-    }
-    
+function getActiveUsers($pdo) {
     try {
+        // Only admin can get all users, regular users can only see themselves
+        if ($_SESSION['role'] !== 'admin') {
+            // Return only current user for non-admin
+            $stmt = $pdo->prepare("
+                SELECT id, name, email, role, department, avatar, last_login 
+                FROM users 
+                WHERE id = ? AND is_active = TRUE
+            ");
+            $stmt->execute([$_SESSION['user_id']]);
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            echo json_encode([
+                'success' => true,
+                'users' => $user ? [$user] : [],
+                'count' => $user ? 1 : 0
+            ]);
+            return;
+        }
+        
+        // Admin gets all users
         $stmt = $pdo->prepare("
             SELECT 
                 u.id, 
@@ -81,7 +132,7 @@ function getActiveUsers() {
             ORDER BY u.role DESC, u.name ASC
         ");
         $stmt->execute();
-        $users = $stmt->fetchAll();
+        $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
         echo json_encode([
             'success' => true,
@@ -90,22 +141,25 @@ function getActiveUsers() {
         ]);
         
     } catch (Exception $e) {
-        echo json_encode(['success' => false, 'message' => 'Failed to fetch users: ' . $e->getMessage()]);
+        error_log("getActiveUsers Error: " . $e->getMessage());
+        echo json_encode([
+            'success' => false, 
+            'message' => 'Failed to fetch users',
+            'debug' => $e->getMessage()
+        ]);
     }
 }
 
-function getUserProfile() {
-    global $pdo;
-    
-    $userId = $_GET['user_id'] ?? $_SESSION['user_id'];
-    
-    // Non-admin users can only view their own profile
-    if ($_SESSION['role'] !== 'admin' && $userId != $_SESSION['user_id']) {
-        echo json_encode(['success' => false, 'message' => 'Permission denied']);
-        return;
-    }
-    
+function getUserProfile($pdo) {
     try {
+        $userId = $_GET['user_id'] ?? $_SESSION['user_id'];
+        
+        // Non-admin users can only view their own profile
+        if ($_SESSION['role'] !== 'admin' && $userId != $_SESSION['user_id']) {
+            echo json_encode(['success' => false, 'message' => 'Permission denied']);
+            return;
+        }
+        
         $stmt = $pdo->prepare("
             SELECT 
                 u.id, 
@@ -127,7 +181,7 @@ function getUserProfile() {
             GROUP BY u.id
         ");
         $stmt->execute([$userId]);
-        $user = $stmt->fetch();
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if (!$user) {
             echo json_encode(['success' => false, 'message' => 'User not found']);
@@ -150,7 +204,7 @@ function getUserProfile() {
             LIMIT 10
         ");
         $stmt->execute([$userId]);
-        $activities = $stmt->fetchAll();
+        $activities = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
         echo json_encode([
             'success' => true,
@@ -159,47 +213,56 @@ function getUserProfile() {
         ]);
         
     } catch (Exception $e) {
-        echo json_encode(['success' => false, 'message' => 'Failed to fetch user profile: ' . $e->getMessage()]);
+        error_log("getUserProfile Error: " . $e->getMessage());
+        echo json_encode([
+            'success' => false, 
+            'message' => 'Failed to fetch user profile',
+            'debug' => $e->getMessage()
+        ]);
     }
 }
 
-function updateUserProfile() {
-    global $pdo;
-    
-    $input = json_decode(file_get_contents('php://input'), true);
-    $userId = $input['user_id'] ?? $_SESSION['user_id'];
-    
-    // Non-admin users can only update their own profile
-    if ($_SESSION['role'] !== 'admin' && $userId != $_SESSION['user_id']) {
-        echo json_encode(['success' => false, 'message' => 'Permission denied']);
-        return;
-    }
-    
-    $allowedFields = ['name', 'phone', 'department'];
-    
-    // Admin can update additional fields
-    if ($_SESSION['role'] === 'admin') {
-        $allowedFields = array_merge($allowedFields, ['email', 'role']);
-    }
-    
-    $updates = [];
-    $params = [];
-    
-    foreach ($allowedFields as $field) {
-        if (isset($input[$field]) && $input[$field] !== null) {
-            $updates[] = "{$field} = ?";
-            $params[] = sanitizeInput($input[$field]);
-        }
-    }
-    
-    if (empty($updates)) {
-        echo json_encode(['success' => false, 'message' => 'No valid fields to update']);
-        return;
-    }
-    
-    $params[] = $userId;
-    
+function updateUserProfile($pdo) {
     try {
+        $input = json_decode(file_get_contents('php://input'), true);
+        
+        if (!$input) {
+            echo json_encode(['success' => false, 'message' => 'Invalid JSON input']);
+            return;
+        }
+        
+        $userId = $input['user_id'] ?? $_SESSION['user_id'];
+        
+        // Non-admin users can only update their own profile
+        if ($_SESSION['role'] !== 'admin' && $userId != $_SESSION['user_id']) {
+            echo json_encode(['success' => false, 'message' => 'Permission denied']);
+            return;
+        }
+        
+        $allowedFields = ['name', 'phone', 'department'];
+        
+        // Admin can update additional fields
+        if ($_SESSION['role'] === 'admin') {
+            $allowedFields = array_merge($allowedFields, ['email', 'role']);
+        }
+        
+        $updates = [];
+        $params = [];
+        
+        foreach ($allowedFields as $field) {
+            if (isset($input[$field]) && $input[$field] !== null) {
+                $updates[] = "{$field} = ?";
+                $params[] = trim($input[$field]); // Simple sanitization
+            }
+        }
+        
+        if (empty($updates)) {
+            echo json_encode(['success' => false, 'message' => 'No valid fields to update']);
+            return;
+        }
+        
+        $params[] = $userId;
+        
         $stmt = $pdo->prepare("
             UPDATE users 
             SET " . implode(', ', $updates) . ", updated_at = NOW()
@@ -212,30 +275,35 @@ function updateUserProfile() {
             return;
         }
         
-        // Log activity
-        logActivity($_SESSION['user_id'], 'profile_updated', 'user', $userId);
+        // Log activity if function exists
+        if (function_exists('logActivity')) {
+            logActivity($_SESSION['user_id'], 'profile_updated', 'user', $userId);
+        }
         
         echo json_encode(['success' => true, 'message' => 'Profile updated successfully']);
         
     } catch (Exception $e) {
-        echo json_encode(['success' => false, 'message' => 'Failed to update profile: ' . $e->getMessage()]);
+        error_log("updateUserProfile Error: " . $e->getMessage());
+        echo json_encode([
+            'success' => false, 
+            'message' => 'Failed to update profile',
+            'debug' => $e->getMessage()
+        ]);
     }
 }
 
-function getUserTasks() {
-    global $pdo;
-    
-    $userId = $_GET['user_id'] ?? $_SESSION['user_id'];
-    $status = $_GET['status'] ?? null;
-    $limit = min($_GET['limit'] ?? 20, 100);
-    
-    // Non-admin users can only view their own tasks
-    if ($_SESSION['role'] !== 'admin' && $userId != $_SESSION['user_id']) {
-        echo json_encode(['success' => false, 'message' => 'Permission denied']);
-        return;
-    }
-    
+function getUserTasks($pdo) {
     try {
+        $userId = $_GET['user_id'] ?? $_SESSION['user_id'];
+        $status = $_GET['status'] ?? null;
+        $limit = min($_GET['limit'] ?? 20, 100);
+        
+        // Non-admin users can only view their own tasks
+        if ($_SESSION['role'] !== 'admin' && $userId != $_SESSION['user_id']) {
+            echo json_encode(['success' => false, 'message' => 'Permission denied']);
+            return;
+        }
+        
         $sql = "
             SELECT 
                 t.*,
@@ -254,22 +322,12 @@ function getUserTasks() {
             $params[] = $status;
         }
         
-        $sql .= " ORDER BY 
-            CASE WHEN t.status = 'On Progress' THEN 1
-                 WHEN t.status = 'Pending' THEN 2
-                 WHEN t.status = 'Done' THEN 3
-                 WHEN t.status = 'On Hold' THEN 4
-                 ELSE 5 END,
-            t.priority = 'high' DESC,
-            t.date ASC
-            LIMIT ?
-        ";
-        
+        $sql .= " ORDER BY t.date DESC, t.created_at DESC LIMIT ?";
         $params[] = $limit;
         
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
-        $tasks = $stmt->fetchAll();
+        $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
         echo json_encode([
             'success' => true,
@@ -278,122 +336,65 @@ function getUserTasks() {
         ]);
         
     } catch (Exception $e) {
-        echo json_encode(['success' => false, 'message' => 'Failed to fetch user tasks: ' . $e->getMessage()]);
+        error_log("getUserTasks Error: " . $e->getMessage());
+        echo json_encode([
+            'success' => false, 
+            'message' => 'Failed to fetch user tasks',
+            'debug' => $e->getMessage()
+        ]);
     }
 }
 
-function getUserStats() {
-    global $pdo;
-    
-    $userId = $_GET['user_id'] ?? $_SESSION['user_id'];
-    $period = $_GET['period'] ?? 'week'; // week, month, year
-    
-    // Non-admin users can only view their own stats
-    if ($_SESSION['role'] !== 'admin' && $userId != $_SESSION['user_id']) {
-        echo json_encode(['success' => false, 'message' => 'Permission denied']);
-        return;
-    }
-    
+function getUserStats($pdo) {
     try {
-        // Determine date range
-        switch ($period) {
-            case 'month':
-                $dateFilter = "t.date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)";
-                break;
-            case 'year':
-                $dateFilter = "t.date >= DATE_SUB(CURDATE(), INTERVAL 365 DAY)";
-                break;
-            default: // week
-                $dateFilter = "t.date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)";
+        $userId = $_GET['user_id'] ?? $_SESSION['user_id'];
+        
+        // Non-admin users can only view their own stats
+        if ($_SESSION['role'] !== 'admin' && $userId != $_SESSION['user_id']) {
+            echo json_encode(['success' => false, 'message' => 'Permission denied']);
+            return;
         }
         
-        // Overall stats
+        // Get user task statistics
         $stmt = $pdo->prepare("
             SELECT 
                 COUNT(*) as total_tasks,
                 COUNT(CASE WHEN status = 'Done' THEN 1 END) as completed_tasks,
                 COUNT(CASE WHEN status = 'On Progress' THEN 1 END) as active_tasks,
                 COUNT(CASE WHEN status = 'Pending' THEN 1 END) as pending_tasks,
-                COUNT(CASE WHEN status = 'Approved' THEN 1 END) as approved_tasks,
                 COUNT(CASE WHEN status = 'On Hold' THEN 1 END) as on_hold_tasks,
                 AVG(CASE WHEN status = 'Done' AND actual_hours IS NOT NULL THEN actual_hours END) as avg_completion_time,
-                COUNT(CASE WHEN priority = 'high' THEN 1 END) as high_priority_tasks,
-                COUNT(CASE WHEN DATE(created_at) = CURDATE() THEN 1 END) as tasks_created_today
-            FROM tasks t
-            WHERE t.assigned_to = ? AND {$dateFilter}
+                AVG(CASE WHEN status = 'Done' AND estimated_hours IS NOT NULL AND actual_hours IS NOT NULL 
+                    THEN (actual_hours / estimated_hours) * 100 END) as avg_accuracy_percentage
+            FROM tasks 
+            WHERE assigned_to = ?
         ");
         $stmt->execute([$userId]);
-        $stats = $stmt->fetch();
+        $stats = $stmt->fetch(PDO::FETCH_ASSOC);
         
-        // Daily completion trend
+        // Get this week's tasks
         $stmt = $pdo->prepare("
-            SELECT 
-                DATE(updated_at) as date,
-                COUNT(*) as completed_count
-            FROM tasks t
-            JOIN status_logs sl ON t.id = sl.task_id
-            WHERE t.assigned_to = ? 
-                AND sl.status = 'Done'
-                AND {$dateFilter}
-            GROUP BY DATE(updated_at)
-            ORDER BY date DESC
-            LIMIT 30
+            SELECT COUNT(*) as this_week_tasks
+            FROM tasks 
+            WHERE assigned_to = ? 
+            AND date >= DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY)
+            AND date < DATE_ADD(DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY), INTERVAL 7 DAY)
         ");
         $stmt->execute([$userId]);
-        $completionTrend = $stmt->fetchAll();
-        
-        // Priority distribution
-        $stmt = $pdo->prepare("
-            SELECT 
-                priority,
-                COUNT(*) as count
-            FROM tasks t
-            WHERE t.assigned_to = ? AND {$dateFilter}
-            GROUP BY priority
-        ");
-        $stmt->execute([$userId]);
-        $priorityDistribution = $stmt->fetchAll();
+        $weekStats = $stmt->fetch(PDO::FETCH_ASSOC);
         
         echo json_encode([
             'success' => true,
-            'stats' => $stats,
-            'completion_trend' => $completionTrend,
-            'priority_distribution' => $priorityDistribution,
-            'period' => $period
+            'stats' => array_merge($stats, $weekStats)
         ]);
         
     } catch (Exception $e) {
-        echo json_encode(['success' => false, 'message' => 'Failed to fetch user stats: ' . $e->getMessage()]);
-    }
-}
-
-// Helper function - should be moved to functions.php
-function sanitizeInput($input) {
-    return htmlspecialchars(trim($input), ENT_QUOTES, 'UTF-8');
-}
-
-// Helper function - should be moved to functions.php  
-function logActivity($userId, $action, $resourceType, $resourceId, $details = null) {
-    global $pdo;
-    
-    try {
-        $stmt = $pdo->prepare("
-            INSERT INTO activity_logs (user_id, action, resource_type, resource_id, details, ip_address, user_agent)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        ");
-        
-        return $stmt->execute([
-            $userId,
-            $action,
-            $resourceType,
-            $resourceId,
-            $details ? json_encode($details) : null,
-            $_SERVER['REMOTE_ADDR'] ?? 'unknown',
-            $_SERVER['HTTP_USER_AGENT'] ?? 'unknown'
+        error_log("getUserStats Error: " . $e->getMessage());
+        echo json_encode([
+            'success' => false, 
+            'message' => 'Failed to fetch user statistics',
+            'debug' => $e->getMessage()
         ]);
-    } catch (Exception $e) {
-        error_log("Failed to log activity: " . $e->getMessage());
-        return false;
     }
 }
 ?>
