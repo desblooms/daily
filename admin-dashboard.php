@@ -23,6 +23,7 @@ $recentActivities = getRecentActivities(20);
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard - Daily Calendar</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         tailwind.config = {
@@ -85,6 +86,14 @@ $recentActivities = getRecentActivities(20);
     window.userRole = '<?= $_SESSION['role'] ?? 'user' ?>';
     window.userId = <?= $_SESSION['user_id'] ?? 'null' ?>;
     window.userName = '<?= htmlspecialchars($_SESSION['user_name'] ?? 'Unknown') ?>';
+    
+    // Debug session information
+    console.log('Session Debug Info:', {
+        userRole: window.userRole,
+        userId: window.userId,
+        userName: window.userName,
+        sessionExists: window.userId !== null
+    });
 </script>
 </head>
 <body class="bg-gray-50">
@@ -532,7 +541,10 @@ $recentActivities = getRecentActivities(20);
                                                         class="p-2 text-gray-400 hover:text-purple-600 transition-colors">
                                                     <i class="fas fa-eye text-xs"></i>
                                                 </button>
-                                                <button onclick="openReassignModal(<?= $task['id'] ?>, '<?= htmlspecialchars($task['title'], ENT_QUOTES) ?>', <?= $task['assigned_to'] ?>)" 
+                                                <button onclick="openReassignModalSafe(this)" 
+                                                        data-task-id="<?= $task['id'] ?>" 
+                                                        data-task-title="<?= htmlspecialchars($task['title']) ?>" 
+                                                        data-assigned-to="<?= $task['assigned_to'] ?>"
                                                         class="p-2 text-blue-400 hover:text-blue-600 transition-colors" title="Reassign Task">
                                                     <i class="fas fa-user-edit text-xs"></i>
                                                 </button>
@@ -608,7 +620,10 @@ $recentActivities = getRecentActivities(20);
                                                 <i class="fas fa-eye mr-2"></i>
                                                 View
                                             </button>
-                                            <button onclick="openReassignModal(<?= $task['id'] ?>, '<?= htmlspecialchars($task['title'], ENT_QUOTES) ?>', <?= $task['assigned_to'] ?>)" 
+                                            <button onclick="openReassignModalSafe(this)" 
+                                                    data-task-id="<?= $task['id'] ?>" 
+                                                    data-task-title="<?= htmlspecialchars($task['title']) ?>" 
+                                                    data-assigned-to="<?= $task['assigned_to'] ?>"
                                                     class="flex-1 bg-purple-50 hover:bg-purple-100 text-purple-700 px-4 py-2 rounded-xl font-medium transition-colors text-sm">
                                                 <i class="fas fa-user-edit mr-2"></i>
                                                 Reassign
@@ -1096,13 +1111,35 @@ $recentActivities = getRecentActivities(20);
         let currentReassignTaskTitle = '';
         let currentAssignedUserId = null;
 
+        function openReassignModalSafe(button) {
+            const taskId = button.getAttribute('data-task-id');
+            const taskTitle = button.getAttribute('data-task-title');
+            const currentUserId = button.getAttribute('data-assigned-to');
+            
+            console.log('Opening reassign modal (safe) for:', { taskId, taskTitle, currentUserId });
+            openReassignModal(taskId, taskTitle, currentUserId);
+        }
+
         function openReassignModal(taskId, taskTitle, currentUserId) {
+            console.log('Opening reassign modal for:', { taskId, taskTitle, currentUserId });
+            
+            // Check if user has admin role
+            if (window.userRole !== 'admin') {
+                alert('Only administrators can reassign tasks.');
+                return;
+            }
+            
             currentReassignTaskId = taskId;
             currentReassignTaskTitle = taskTitle;
             currentAssignedUserId = currentUserId;
             
             // Update modal content
-            document.getElementById('reassignTaskTitle').textContent = taskTitle;
+            const titleElement = document.getElementById('reassignTaskTitle');
+            if (!titleElement) {
+                console.error('reassignTaskTitle element not found');
+                return;
+            }
+            titleElement.textContent = taskTitle;
             
             // Find current assignee name
             const userRadios = document.querySelectorAll('input[name="reassignUser"]');
@@ -1123,11 +1160,26 @@ $recentActivities = getRecentActivities(20);
                 radio.checked = false;
             });
             
-            document.getElementById('currentAssignee').textContent = currentAssigneeName;
-            document.getElementById('reassignReason').value = '';
+            const currentAssigneeElement = document.getElementById('currentAssignee');
+            if (currentAssigneeElement) {
+                currentAssigneeElement.textContent = currentAssigneeName;
+            }
+            
+            const reasonElement = document.getElementById('reassignReason');
+            if (reasonElement) {
+                reasonElement.value = '';
+            }
             
             // Show modal
-            document.getElementById('reassignModal').classList.remove('hidden');
+            const modal = document.getElementById('reassignModal');
+            if (!modal) {
+                console.error('reassignModal element not found');
+                alert('Error: Reassign modal not found. Please refresh the page.');
+                return;
+            }
+            
+            console.log('Showing modal');
+            modal.classList.remove('hidden');
             document.body.style.overflow = 'hidden';
         }
 
@@ -1166,7 +1218,8 @@ $recentActivities = getRecentActivities(20);
             }
             
             // Get new assignee name for confirmation
-            const newAssigneeName = selectedRadio.closest('label').querySelector('.font-medium').textContent;
+            const newAssigneeElement = selectedRadio.closest('label').querySelector('.font-medium');
+            const newAssigneeName = newAssigneeElement ? newAssigneeElement.textContent : 'Unknown User';
             
             if (!confirm(`Are you sure you want to reassign "${currentReassignTaskTitle}" to ${newAssigneeName}?`)) {
                 return;
@@ -1178,6 +1231,16 @@ $recentActivities = getRecentActivities(20);
             confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Reassigning...';
             confirmBtn.disabled = true;
             
+            // Prepare request data
+            const requestData = {
+                action: 'update_task',
+                task_id: currentReassignTaskId,
+                assigned_to: newUserId,
+                reassign_reason: reason || `Task reassigned to ${newAssigneeName}`
+            };
+            
+            console.log('Making reassignment API call with data:', requestData);
+            
             // Make API call
             fetch('api/tasks.php', {
                 method: 'POST',
@@ -1185,15 +1248,20 @@ $recentActivities = getRecentActivities(20);
                     'Content-Type': 'application/json',
                 },
                 credentials: 'same-origin',
-                body: JSON.stringify({
-                    action: 'update_task',
-                    task_id: currentReassignTaskId,
-                    assigned_to: newUserId,
-                    reassign_reason: reason || `Task reassigned to ${newAssigneeName}`
-                })
+                body: JSON.stringify(requestData)
             })
-            .then(response => response.json())
+            .then(response => {
+                console.log('API Response status:', response.status);
+                console.log('API Response headers:', response.headers);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
             .then(data => {
+                console.log('API Response data:', data);
+                
                 if (data.success) {
                     // Log the reassignment activity
                     logReassignActivity(currentReassignTaskId, currentAssignedUserId, newUserId, reason);
@@ -1208,8 +1276,18 @@ $recentActivities = getRecentActivities(20);
                 }
             })
             .catch(error => {
-                console.error('Error:', error);
-                alert('Network error. Please try again.');
+                console.error('Full error details:', error);
+                console.error('Error name:', error.name);
+                console.error('Error message:', error.message);
+                
+                if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+                    alert('Network connection error. Please check your internet connection and try again.');
+                } else if (error.message.includes('HTTP error')) {
+                    alert('Server error: ' + error.message + '. Please contact support.');
+                } else {
+                    alert('Network error: ' + error.message + '. Please try again.');
+                }
+                
                 confirmBtn.innerHTML = originalText;
                 confirmBtn.disabled = false;
             });

@@ -42,6 +42,8 @@ try {
     // Get action from input data or fallback to GET/POST
     $action = $input['action'] ?? $_GET['action'] ?? $_POST['action'] ?? '';
     
+    // Debug logging (remove in production)
+    error_log("Tasks API called: Action={$action}, User={$_SESSION['user_id']}, Role={$_SESSION['role']}, Input=" . json_encode($input));
     
     switch ($action) {
         case 'get_tasks':
@@ -252,9 +254,12 @@ function createNewTask($pdo, $input) {
 }
 
 function updateTask($pdo, $input) {
+    error_log("updateTask called with input: " . json_encode($input));
+    
     $taskId = $input['task_id'] ?? null;
     
     if (!$taskId) {
+        error_log("updateTask: Missing task ID");
         echo json_encode(['success' => false, 'message' => 'Missing task ID']);
         return;
     }
@@ -275,6 +280,14 @@ function updateTask($pdo, $input) {
         $task['created_by'] != $_SESSION['user_id']) {
         echo json_encode(['success' => false, 'message' => 'Permission denied']);
         return;
+    }
+    
+    // Special check for reassignment - only admins can change assigned_to
+    if (isset($input['assigned_to']) && $input['assigned_to'] != $task['assigned_to']) {
+        if ($_SESSION['role'] !== 'admin') {
+            echo json_encode(['success' => false, 'message' => 'Only administrators can reassign tasks']);
+            return;
+        }
     }
     
     try {
