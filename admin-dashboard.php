@@ -7,10 +7,11 @@ requireAdmin();
 
 $currentView = $_GET['view'] ?? 'dashboard';
 $selectedDate = $_GET['date'] ?? date('Y-m-d');
+$filterUserId = isset($_GET['user_id']) && is_numeric($_GET['user_id']) ? (int)$_GET['user_id'] : null;
 
 // Get analytics data
-$analytics = getAnalytics($selectedDate);
-$todayTasks = getTasks(null, $selectedDate);
+$analytics = getAnalytics($selectedDate, $filterUserId);
+$todayTasks = getTasks($filterUserId, $selectedDate);
 $users = getAllUsers();
 
 // Get recent activities
@@ -397,7 +398,10 @@ $recentActivities = getRecentActivities(20);
                                 <div class="bg-white rounded-xl p-4 shadow-sm border">
                                     <div class="flex items-center justify-between mb-4">
                                         <div>
-                                            <h3 class="text-lg font-bold text-gray-900">Tasks</h3>
+                                            <h3 class="text-lg font-bold text-gray-900">Tasks<?php if ($filterUserId): ?> - <?php 
+                                                $filteredUser = array_filter($users, function($u) use ($filterUserId) { return $u['id'] == $filterUserId; });
+                                                echo !empty($filteredUser) ? htmlspecialchars(array_values($filteredUser)[0]['name']) : 'Unknown User';
+                                            ?><?php endif; ?></h3>
                                             <p class="text-sm text-gray-500"><?= count($todayTasks) ?> tasks for <?= date('M j', strtotime($selectedDate)) ?></p>
                                         </div>
                                         <button onclick="globalTaskManager.openAddTaskModal()" class="bg-gradient-to-r from-purple-500 to-blue-500 text-white p-3 rounded-xl shadow-lg">
@@ -1241,8 +1245,8 @@ $recentActivities = getRecentActivities(20);
             
             console.log('Making reassignment API call with data:', requestData);
             
-            // Make API call
-            fetch('api/tasks.php', {
+            // Make API call (using minimal API for testing)
+            fetch('api/tasks-minimal.php', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -1434,13 +1438,27 @@ $recentActivities = getRecentActivities(20);
 
 <?php
 function getViewTitle($view) {
+    global $filterUserId, $users;
+    
+    $title = '';
     switch ($view) {
-        case 'dashboard': return 'Dashboard Overview';
-        case 'tasks': return 'Task Management';
-        case 'analytics': return 'Analytics & Reports';
-        case 'users': return 'Team Management';
-        default: return 'Admin Dashboard';
+        case 'dashboard': $title = 'Dashboard Overview'; break;
+        case 'tasks': $title = 'Task Management'; break;
+        case 'analytics': $title = 'Analytics & Reports'; break;
+        case 'users': $title = 'Team Management'; break;
+        default: $title = 'Admin Dashboard'; break;
     }
+    
+    // Add user filter to title if applicable
+    if ($filterUserId && $view === 'tasks') {
+        $filteredUser = array_filter($users, function($u) use ($filterUserId) { return $u['id'] == $filterUserId; });
+        if (!empty($filteredUser)) {
+            $userName = htmlspecialchars(array_values($filteredUser)[0]['name']);
+            $title .= ' - ' . $userName;
+        }
+    }
+    
+    return $title;
 }
 
 function getStatusStyle($status) {

@@ -1,7 +1,8 @@
 <?php
-// api/tasks.php - Clean version
-ini_set('display_errors', 0);
-error_reporting(0);
+// api/tasks.php - Clean version  
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
+ini_set('log_errors', 1);
 
 try {
     // Set JSON header first
@@ -264,6 +265,14 @@ function updateTask($pdo, $input) {
         return;
     }
     
+    // Ensure task_id is an integer
+    $taskId = (int)$taskId;
+    if ($taskId <= 0) {
+        error_log("updateTask: Invalid task ID: " . $input['task_id']);
+        echo json_encode(['success' => false, 'message' => 'Invalid task ID']);
+        return;
+    }
+    
     // Get current task
     $stmt = $pdo->prepare("SELECT * FROM tasks WHERE id = ?");
     $stmt->execute([$taskId]);
@@ -305,14 +314,26 @@ function updateTask($pdo, $input) {
         
         foreach ($allowedFields as $field) {
             if (isset($input[$field])) {
+                $value = $input[$field];
+                
+                // Validate and convert specific fields
+                if ($field === 'assigned_to') {
+                    $value = (int)$value;
+                    if ($value <= 0) {
+                        error_log("updateTask: Invalid assigned_to value: " . $input[$field]);
+                        echo json_encode(['success' => false, 'message' => 'Invalid user ID for assignment']);
+                        return;
+                    }
+                }
+                
                 $updateFields[] = "$field = ?";
-                $params[] = $input[$field];
-                $changes[$field] = ['from' => $task[$field], 'to' => $input[$field]];
+                $params[] = $value;
+                $changes[$field] = ['from' => $task[$field], 'to' => $value];
                 
                 // Check if this is a reassignment
-                if ($field === 'assigned_to' && $input[$field] != $task[$field]) {
+                if ($field === 'assigned_to' && $value != $task[$field]) {
                     $isReassignment = true;
-                    $newAssignedTo = $input[$field];
+                    $newAssignedTo = $value;
                 }
             }
         }
@@ -330,70 +351,67 @@ function updateTask($pdo, $input) {
         
         // Special logging for reassignment
         if ($isReassignment) {
-            // Get user names for better logging
-            $stmt = $pdo->prepare("SELECT name FROM users WHERE id = ?");
-            $stmt->execute([$oldAssignedTo]);
-            $oldUserName = $stmt->fetchColumn() ?: 'Unknown';
-            
-            $stmt = $pdo->prepare("SELECT name FROM users WHERE id = ?");
-            $stmt->execute([$newAssignedTo]);
-            $newUserName = $stmt->fetchColumn() ?: 'Unknown';
-            
-            // Log reassignment activity
-            $stmt = $pdo->prepare("
-                INSERT INTO activity_logs (user_id, action, resource_type, resource_id, details)
-                VALUES (?, 'task_reassigned', 'task', ?, ?)
-            ");
-            $stmt->execute([
-                $_SESSION['user_id'],
-                $taskId,
-                json_encode([
+            try {
+                // Get user names for better logging
+                $stmt = $pdo->prepare("SELECT name FROM users WHERE id = ?");
+                $stmt->execute([$oldAssignedTo]);
+                $oldUserName = $stmt->fetchColumn() ?: 'Unknown';
+                
+                $stmt = $pdo->prepare("SELECT name FROM users WHERE id = ?");
+                $stmt->execute([$newAssignedTo]);
+                $newUserName = $stmt->fetchColumn() ?: 'Unknown';
+                
+                // Use the existing logActivity function instead of direct SQL
+                if (!function_exists('logActivity')) {
+                    require_once '../includes/functions.php';
+                }
+                logActivity($_SESSION['user_id'], 'task_reassigned', 'task', $taskId, [
                     'from_user' => $oldAssignedTo,
                     'to_user' => $newAssignedTo,
                     'from_user_name' => $oldUserName,
                     'to_user_name' => $newUserName,
                     'reason' => $input['reassign_reason'] ?? 'Task reassigned',
                     'task_title' => $task['title']
-                ])
-            ]);
-            
-            // Create notifications for both users
-            require_once '../includes/functions.php';
-            
-            // Notify the new assignee
-            if ($newAssignedTo != $_SESSION['user_id']) {
-                createNotification(
-                    $newAssignedTo, 
-                    'Task Assigned to You', 
-                    "You have been assigned the task: " . $task['title'], 
-                    'info', 
-                    'task', 
-                    $taskId
-                );
-            }
-            
-            // Notify the previous assignee if different from current user
-            if ($oldAssignedTo != $_SESSION['user_id'] && $oldAssignedTo != $newAssignedTo) {
-                createNotification(
-                    $oldAssignedTo, 
-                    'Task Reassigned', 
-                    "The task '" . $task['title'] . "' has been reassigned to " . $newUserName, 
-                    'info', 
-                    'task', 
-                    $taskId
-                );
+                ]);
+                
+                // Notify the new assignee
+                if ($newAssignedTo != $_SESSION['user_id']) {
+                    createNotification(
+                        $newAssignedTo, 
+                        'Task Assigned to You', 
+                        "You have been assigned the task: " . $task['title'], 
+                        'info', 
+                        'task', 
+                        $taskId
+                    );
+                }
+                
+                // Notify the previous assignee if different from current user
+                if ($oldAssignedTo != $_SESSION['user_id'] && $oldAssignedTo != $newAssignedTo) {
+                    createNotification(
+                        $oldAssignedTo, 
+                        'Task Reassigned', 
+                        "The task '" . $task['title'] . "' has been reassigned to " . $newUserName, 
+                        'info', 
+                        'task', 
+                        $taskId
+                    );
+                }
+            } catch (Exception $e) {
+                error_log("Reassignment logging/notification error: " . $e->getMessage());
+                // Continue with the update even if logging/notifications fail
             }
         } else {
             // Regular update logging
-            $stmt = $pdo->prepare("
-                INSERT INTO activity_logs (user_id, action, resource_type, resource_id, details)
-                VALUES (?, 'task_updated', 'task', ?, ?)
-            ");
-            $stmt->execute([
-                $_SESSION['user_id'],
-                $taskId,
-                json_encode(['changes' => array_keys($input)])
-            ]);
+            try {
+                if (!function_exists('logActivity')) {
+                    require_once '../includes/functions.php';
+                }
+                logActivity($_SESSION['user_id'], 'task_updated', 'task', $taskId, ['changes' => array_keys($input)]);
+            } catch (Exception $e) {
+                error_log("Task update logging error: " . $e->getMessage());
+                // Continue with the update even if logging fails
+            }
         }
         
         $pdo->commit();
@@ -402,6 +420,7 @@ function updateTask($pdo, $input) {
         
     } catch (Exception $e) {
         $pdo->rollback();
+        error_log("updateTask error: " . $e->getMessage() . " at " . $e->getFile() . ":" . $e->getLine());
         echo json_encode(['success' => false, 'message' => 'Failed to update task: ' . $e->getMessage()]);
     }
 }
