@@ -23,15 +23,16 @@ try {
         throw new Exception('Database connection failed');
     }
     
-    $action = $_GET['action'] ?? $_POST['action'] ?? '';
-    
-    // Get input data
+    // Get input data first
     $input = [];
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $input = json_decode(file_get_contents('php://input'), true) ?? $_POST;
     } else {
         $input = $_GET;
     }
+    
+    // Get action from input data or fallback to GET/POST
+    $action = $input['action'] ?? $_GET['action'] ?? $_POST['action'] ?? '';
     
     switch ($action) {
         case 'create':
@@ -44,7 +45,16 @@ try {
             break;
             
         default:
-            echo json_encode(['success' => false, 'message' => 'Invalid action: ' . $action]);
+            echo json_encode([
+                'success' => false, 
+                'message' => 'Invalid action: ' . $action,
+                'debug' => [
+                    'received_action' => $action,
+                    'input_data' => $input,
+                    'method' => $_SERVER['REQUEST_METHOD'],
+                    'content_type' => $_SERVER['CONTENT_TYPE'] ?? 'not set'
+                ]
+            ]);
     }
     
 } catch (Exception $e) {

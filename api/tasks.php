@@ -215,7 +215,7 @@ function createNewTask($pdo, $input) {
         
         // Log activity
         $stmt = $pdo->prepare("
-            INSERT INTO activity_logs (user_id, action, target_type, target_id, details)
+            INSERT INTO activity_logs (user_id, action, resource_type, resource_id, details)
             VALUES (?, 'task_created', 'task', ?, ?)
         ");
         $stmt->execute([
@@ -293,7 +293,7 @@ function updateTask($pdo, $input) {
         
         // Log activity
         $stmt = $pdo->prepare("
-            INSERT INTO activity_logs (user_id, action, target_type, target_id, details)
+            INSERT INTO activity_logs (user_id, action, resource_type, resource_id, details)
             VALUES (?, 'task_updated', 'task', ?, ?)
         ");
         $stmt->execute([
@@ -364,7 +364,7 @@ function updateTaskStatus($pdo, $input) {
         
         // Log activity
         $stmt = $pdo->prepare("
-            INSERT INTO activity_logs (user_id, action, target_type, target_id, details)
+            INSERT INTO activity_logs (user_id, action, resource_type, resource_id, details)
             VALUES (?, 'status_changed', 'task', ?, ?)
         ");
         $stmt->execute([
@@ -469,7 +469,7 @@ function deleteTask($pdo, $input) {
         $stmt = $pdo->prepare("DELETE FROM status_logs WHERE task_id = ?");
         $stmt->execute([$taskId]);
         
-        $stmt = $pdo->prepare("DELETE FROM activity_logs WHERE target_type = 'task' AND target_id = ?");
+        $stmt = $pdo->prepare("DELETE FROM activity_logs WHERE resource_type = 'task' AND resource_id = ?");
         $stmt->execute([$taskId]);
         
         // Delete the task
