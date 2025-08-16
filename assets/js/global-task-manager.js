@@ -593,6 +593,49 @@ class GlobalTaskManager {
         await this.loadUsers();
         console.log('✅ Users reloaded');
     }
+
+    async deleteTask(taskId, taskTitle = '') {
+        if (!taskId) {
+            this.showNotification('Task ID is required', 'error');
+            return;
+        }
+
+        // Confirm deletion
+        const confirmMessage = taskTitle 
+            ? `Are you sure you want to delete the task "${taskTitle}"?` 
+            : 'Are you sure you want to delete this task?';
+            
+        if (!confirm(confirmMessage + '\n\nThis action cannot be undone.')) {
+            return;
+        }
+
+        try {
+            const response = await this.apiCall('api/tasks.php', {
+                method: 'POST',
+                body: JSON.stringify({
+                    action: 'delete_task',
+                    task_id: taskId
+                })
+            });
+
+            if (response.success) {
+                this.showNotification('Task deleted successfully!', 'success');
+                
+                // Refresh the page or update UI
+                if (typeof refreshTasks === 'function') {
+                    refreshTasks();
+                } else {
+                    setTimeout(() => location.reload(), 1000);
+                }
+            } else {
+                this.showNotification(response.message || 'Failed to delete task', 'error');
+            }
+
+        } catch (error) {
+            console.error('Error deleting task:', error);
+            this.showNotification('Network error. Please try again.', 'error');
+        }
+    }
 }
 
 // Initialize global task manager when DOM is ready
@@ -628,5 +671,13 @@ function showNotification(message, type = 'info') {
         window.globalTaskManager.showNotification(message, type);
     } else {
         alert(message); // Fallback
+    }
+}
+
+function deleteTask(taskId, taskTitle = '') {
+    if (window.globalTaskManager) {
+        window.globalTaskManager.deleteTask(taskId, taskTitle);
+    } else {
+        console.error('GlobalTaskManager not initialized');
     }
 }
