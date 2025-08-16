@@ -145,8 +145,8 @@ if ($_POST && isset($_POST['action'])) {
                         <button onclick="updateStatus(<?= $task['id'] ?>, 'On Hold')" 
                                 class="bg-yellow-500 text-white px-3 py-1 rounded-lg text-xs">Put On Hold</button>
                     <?php elseif ($task['status'] === 'On Hold'): ?>
-                        <button onclick="updateStatus(<?= $task['id'] ?>, 'On Progress')" 
-                                class="bg-blue-500 text-white px-3 py-1 rounded-lg text-xs">Resume</button>
+                        <button onclick="openResumeModal(<?= $task['id'] ?>)" 
+                                class="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded-lg text-xs transition-colors">Resume Task</button>
                     <?php endif; ?>
                 </div>
             </div>
@@ -210,6 +210,158 @@ if ($_POST && isset($_POST['action'])) {
                 }
             });
         }
+    </script>
+
+    <!-- Resume Task Modal -->
+    <div id="resumeModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-md mx-4 transform transition-all duration-300 scale-95" id="resumeModalContent">
+            <div class="text-center mb-6">
+                <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1m4 0h1m-6 4h8m-2-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </div>
+                <h2 class="text-xl font-bold text-gray-900 mb-2">Resume Task</h2>
+                <p class="text-gray-600">Choose the status you want to change this task to:</p>
+            </div>
+
+            <div class="space-y-3 mb-6">
+                <button onclick="resumeTask('Pending')" class="w-full flex items-center justify-between p-4 bg-yellow-50 hover:bg-yellow-100 border-2 border-yellow-200 rounded-xl transition-colors group">
+                    <div class="flex items-center">
+                        <div class="w-3 h-3 bg-yellow-500 rounded-full mr-3"></div>
+                        <div class="text-left">
+                            <div class="font-semibold text-gray-900">Pending</div>
+                            <div class="text-sm text-gray-600">Task is ready to be started</div>
+                        </div>
+                    </div>
+                    <svg class="w-5 h-5 text-gray-400 group-hover:text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                    </svg>
+                </button>
+
+                <button onclick="resumeTask('On Progress')" class="w-full flex items-center justify-between p-4 bg-blue-50 hover:bg-blue-100 border-2 border-blue-200 rounded-xl transition-colors group">
+                    <div class="flex items-center">
+                        <div class="w-3 h-3 bg-blue-500 rounded-full mr-3"></div>
+                        <div class="text-left">
+                            <div class="font-semibold text-gray-900">On Progress</div>
+                            <div class="text-sm text-gray-600">Task is actively being worked on</div>
+                        </div>
+                    </div>
+                    <svg class="w-5 h-5 text-gray-400 group-hover:text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <div class="flex gap-3">
+                <button onclick="closeResumeModal()" class="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl transition-colors">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentTaskId = null;
+
+        function openResumeModal(taskId) {
+            currentTaskId = taskId;
+            const modal = document.getElementById('resumeModal');
+            const content = document.getElementById('resumeModalContent');
+            
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                content.classList.remove('scale-95');
+                content.classList.add('scale-100');
+            }, 10);
+        }
+
+        function closeResumeModal() {
+            const modal = document.getElementById('resumeModal');
+            const content = document.getElementById('resumeModalContent');
+            
+            content.classList.remove('scale-100');
+            content.classList.add('scale-95');
+            
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                currentTaskId = null;
+            }, 300);
+        }
+
+        function resumeTask(newStatus) {
+            if (!currentTaskId) return;
+            
+            fetch('./api/tasks.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify({
+                    action: 'update_status',
+                    task_id: currentTaskId,
+                    status: newStatus,
+                    comments: `Task resumed from hold status to ${newStatus}`
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    closeResumeModal();
+                    // Show success message
+                    showSuccessMessage(`Task status updated to ${newStatus}!`);
+                    // Reload page after a short delay
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    alert('Error: ' + (data.message || 'Failed to update task status'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Network error. Please try again.');
+            });
+        }
+
+        function showSuccessMessage(message) {
+            const successDiv = document.createElement('div');
+            successDiv.className = 'fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 transform translate-x-full transition-transform duration-300';
+            successDiv.innerHTML = `
+                <div class="flex items-center">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    ${message}
+                </div>
+            `;
+            
+            document.body.appendChild(successDiv);
+            
+            setTimeout(() => {
+                successDiv.classList.remove('translate-x-full');
+            }, 100);
+            
+            setTimeout(() => {
+                successDiv.classList.add('translate-x-full');
+                setTimeout(() => {
+                    document.body.removeChild(successDiv);
+                }, 300);
+            }, 3000);
+        }
+
+        // Close modal when clicking outside
+        document.getElementById('resumeModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeResumeModal();
+            }
+        });
+
+        // Close modal with Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && !document.getElementById('resumeModal').classList.contains('hidden')) {
+                closeResumeModal();
+            }
+        });
     </script>
 </body>
 </html>

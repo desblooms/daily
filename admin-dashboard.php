@@ -462,6 +462,12 @@ $recentActivities = getRecentActivities(20);
                                                                     class="px-2 py-1 bg-purple-500 text-white rounded text-xs hover:bg-purple-600 transition-colors">
                                                                 Approve
                                                             </button>
+                                                        <?php elseif ($task['status'] === 'On Hold'): ?>
+                                                            <button onclick="removeFromHold(<?= $task['id'] ?>)" 
+                                                                    class="px-2 py-1 bg-green-500 text-white rounded text-xs hover:bg-green-600 transition-colors"
+                                                                    title="Remove from Hold">
+                                                                Resume
+                                                            </button>
                                                         <?php endif; ?>
                                                     </div>
                                                 </td>
@@ -753,6 +759,41 @@ $recentActivities = getRecentActivities(20);
                 location.reload();
             }
         }, 60000);
+
+        // Fallback function for removeFromHold if global-task-manager.js doesn't load
+        if (typeof removeFromHold === 'undefined') {
+            function removeFromHold(taskId) {
+                // Simple fallback - directly resume to "On Progress"
+                if (confirm('Resume this task to "On Progress" status?')) {
+                    fetch('api/tasks.php', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        credentials: 'same-origin',
+                        body: JSON.stringify({
+                            action: 'update_status',
+                            task_id: taskId,
+                            status: 'On Progress',
+                            comments: 'Task resumed from hold status'
+                        })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            alert('Task status updated successfully!');
+                            location.reload();
+                        } else {
+                            alert('Error: ' + (data.message || 'Failed to update task status'));
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('Network error. Please try again.');
+                    });
+                }
+            }
+        }
     </script>
 </body>
 </html>

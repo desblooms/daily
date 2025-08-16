@@ -173,6 +173,13 @@ class GlobalTaskManager {
     // Enhanced API call method with better error handling
     async apiCall(endpoint, options = {}) {
         try {
+            // Ensure we use the correct base path for API calls
+            const basePath = window.location.pathname.includes('/admin-dashboard.php') || 
+                           window.location.pathname.includes('/index.php') ||
+                           window.location.pathname.endsWith('/') ? './' : './';
+            
+            const fullEndpoint = endpoint.startsWith('http') ? endpoint : basePath + endpoint;
+            
             const defaultOptions = {
                 headers: {
                     'Content-Type': 'application/json',
@@ -183,7 +190,11 @@ class GlobalTaskManager {
             
             const mergedOptions = { ...defaultOptions, ...options };
             
-            const response = await fetch(endpoint, mergedOptions);
+            if (this.debug) {
+                console.log('🌐 API Call:', fullEndpoint, mergedOptions);
+            }
+            
+            const response = await fetch(fullEndpoint, mergedOptions);
             
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -199,7 +210,9 @@ class GlobalTaskManager {
             return JSON.parse(responseText);
             
         } catch (error) {
-            console.error(`API call failed for ${endpoint}:`, error);
+            console.error(`API call failed for ${fullEndpoint || endpoint}:`, error);
+            console.error('Current location:', window.location.pathname);
+            console.error('Attempted URL:', fullEndpoint || endpoint);
             throw error;
         }
     }
@@ -679,5 +692,106 @@ function deleteTask(taskId, taskTitle = '') {
         window.globalTaskManager.deleteTask(taskId, taskTitle);
     } else {
         console.error('GlobalTaskManager not initialized');
+    }
+}
+
+function removeFromHold(taskId) {
+    // Create and show a modal for better UX
+    const modalHtml = `
+        <div id="resumeModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div class="bg-white rounded-2xl p-6 w-full max-w-md mx-4 transform transition-all duration-300">
+                <div class="text-center mb-6">
+                    <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1m4 0h1m-6 4h8m-2-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <h2 class="text-xl font-bold text-gray-900 mb-2">Resume Task</h2>
+                    <p class="text-gray-600">Choose the status you want to change this task to:</p>
+                </div>
+
+                <div class="space-y-3 mb-6">
+                    <button onclick="resumeTaskGlobal(${taskId}, 'Pending')" class="w-full flex items-center justify-between p-4 bg-yellow-50 hover:bg-yellow-100 border-2 border-yellow-200 rounded-xl transition-colors group">
+                        <div class="flex items-center">
+                            <div class="w-3 h-3 bg-yellow-500 rounded-full mr-3"></div>
+                            <div class="text-left">
+                                <div class="font-semibold text-gray-900">Pending</div>
+                                <div class="text-sm text-gray-600">Task is ready to be started</div>
+                            </div>
+                        </div>
+                        <svg class="w-5 h-5 text-gray-400 group-hover:text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                        </svg>
+                    </button>
+
+                    <button onclick="resumeTaskGlobal(${taskId}, 'On Progress')" class="w-full flex items-center justify-between p-4 bg-blue-50 hover:bg-blue-100 border-2 border-blue-200 rounded-xl transition-colors group">
+                        <div class="flex items-center">
+                            <div class="w-3 h-3 bg-blue-500 rounded-full mr-3"></div>
+                            <div class="text-left">
+                                <div class="font-semibold text-gray-900">On Progress</div>
+                                <div class="text-sm text-gray-600">Task is actively being worked on</div>
+                            </div>
+                        </div>
+                        <svg class="w-5 h-5 text-gray-400 group-hover:text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="flex gap-3">
+                    <button onclick="closeResumeModalGlobal()" class="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl transition-colors">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Add modal to page
+    const modalDiv = document.createElement('div');
+    modalDiv.innerHTML = modalHtml;
+    document.body.appendChild(modalDiv.firstElementChild);
+}
+
+function resumeTaskGlobal(taskId, newStatus) {
+    if (window.globalTaskManager) {
+        window.globalTaskManager.updateTaskStatus(taskId, newStatus, `Task resumed from hold status to ${newStatus}`);
+    } else {
+        // Fallback direct API call
+        fetch('api/tasks.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+                action: 'update_status',
+                task_id: taskId,
+                status: newStatus,
+                comments: `Task resumed from hold status to ${newStatus}`
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification(`Task status updated to ${newStatus}!`, 'success');
+            } else {
+                showNotification(data.message || 'Failed to update task status', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showNotification('Network error. Please try again.', 'error');
+        });
+    }
+    
+    closeResumeModalGlobal();
+    setTimeout(() => location.reload(), 1000);
+}
+
+function closeResumeModalGlobal() {
+    const modal = document.getElementById('resumeModal');
+    if (modal) {
+        modal.remove();
     }
 }

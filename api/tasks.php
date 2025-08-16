@@ -62,6 +62,7 @@ try {
             deleteTask($pdo, $input);
             break;
             
+        case 'status':
         case 'update_status':
             updateTaskStatus($pdo, $input);
             break;
