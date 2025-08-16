@@ -245,7 +245,7 @@ CREATE TABLE task_templates (
 
 -- Insert default admin user (password: admin123)
 INSERT INTO users (name, email, password, role, department) VALUES 
-('System Administrator', 'admin@example.com', '$2y$10$VLXVfbJz/z.RR4L6dWNy5.YJY.1qI2Qp8Zq7Vr4V/DhA8b3FrKHjG', 'admin', 'IT'),
+('System Administrator', 'desblooms@gmail.com', '$2y$10$VLXVfbJz/z.RR4L6dWNy5.YJY.1qI2Qp8Zq7Vr4V/DhA8b3FrKHjG', 'admin', 'IT'),
 ('John Doe', 'user@example.com', '$2y$10$VLXVfbJz/z.RR4L6dWNy5.YJY.1qI2Qp8Zq7Vr4V/DhA8b3FrKHjG', 'user', 'Development'),
 ('Jane Smith', 'jane@example.com', '$2y$10$VLXVfbJz/z.RR4L6dWNy5.YJY.1qI2Qp8Zq7Vr4V/DhA8b3FrKHjG', 'user', 'Design'),
 ('Mike Johnson', 'mike@example.com', '$2y$10$VLXVfbJz/z.RR4L6dWNy5.YJY.1qI2Qp8Zq7Vr4V/DhA8b3FrKHjG', 'user', 'Marketing');

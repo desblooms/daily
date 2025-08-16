@@ -66,16 +66,6 @@ if (isLoggedIn()) {
     exit;
 }
 
-function calculatePasswordStrength($password) {
-    $strength = 0;
-    if (strlen($password) >= 6) $strength++;
-    if (strlen($password) >= 8) $strength++;
-    if (preg_match('/[a-z]/', $password)) $strength++;
-    if (preg_match('/[A-Z]/', $password)) $strength++;
-    if (preg_match('/[0-9]/', $password)) $strength++;
-    if (preg_match('/[^A-Za-z0-9]/', $password)) $strength++;
-    return min($strength, 5);
-}
 ?>
 <!DOCTYPE html>
 <html lang="en">
