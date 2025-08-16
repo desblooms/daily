@@ -361,7 +361,7 @@ class GlobalTaskManager {
         try {
             const formData = new FormData(form);
             const taskData = {
-                action: 'create',
+                action: 'create_task',
                 title: formData.get('title'),
                 details: formData.get('details'),
                 assigned_to: formData.get('assigned_to'),
@@ -389,7 +389,7 @@ class GlobalTaskManager {
             submitButton.disabled = true;
 
             // Make API call
-            const response = await this.apiCall('api/tasks.php', {
+            const response = await this.apiCall('api/tasks-simple.php', {
                 method: 'POST',
                 body: JSON.stringify(taskData)
             });

@@ -1,11 +1,7 @@
 <?php
-// api/tasks.php - Fixed version with proper error handling and JSON responses
-// Prevent any HTML output and ensure JSON responses
+// api/tasks.php - Clean version
 ini_set('display_errors', 0);
 error_reporting(0);
-
-// Start output buffering to catch any unexpected output
-ob_start();
 
 try {
     // Set JSON header first
@@ -19,12 +15,10 @@ try {
     
     // Include required files
     require_once '../includes/db.php';
-    require_once '../includes/functions.php';
+    require_once '../includes/auth.php';
     
     // Check if user is logged in
     if (!isset($_SESSION['user_id']) || !isset($_SESSION['role'])) {
-        // Clean any output buffer
-        ob_clean();
         http_response_code(401);
         echo json_encode(['success' => false, 'message' => 'Authentication required']);
         exit;
@@ -32,7 +26,7 @@ try {
     
     // Verify database connection
     if (!isset($pdo) || !$pdo) {
-        ob_clean();
+        http_response_code(500);
         echo json_encode(['success' => false, 'message' => 'Database connection failed']);
         exit;
     }
@@ -47,8 +41,6 @@ try {
         $input = $_GET;
     }
     
-    // Clean output buffer before processing
-    ob_clean();
     
     switch ($action) {
         case 'get_tasks':
@@ -88,26 +80,21 @@ try {
     }
     
 } catch (Exception $e) {
-    // Clean any output buffer
-    ob_clean();
+    http_response_code(500);
     error_log("Tasks API Error: " . $e->getMessage());
     echo json_encode([
         'success' => false, 
         'message' => 'Internal server error',
-        'debug' => $e->getMessage() // Remove in production
+        'debug' => $e->getMessage()
     ]);
 } catch (Error $e) {
-    // Clean any output buffer
-    ob_clean();
+    http_response_code(500);
     error_log("Tasks API Fatal Error: " . $e->getMessage());
     echo json_encode([
         'success' => false, 
         'message' => 'System error',
-        'debug' => $e->getMessage() // Remove in production
+        'debug' => $e->getMessage()
     ]);
-} finally {
-    // End output buffering
-    ob_end_flush();
 }
 
 function getTasks($pdo, $input) {
