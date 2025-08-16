@@ -462,12 +462,6 @@ $recentActivities = getRecentActivities(20);
                                                                     class="px-2 py-1 bg-purple-500 text-white rounded text-xs hover:bg-purple-600 transition-colors">
                                                                 Approve
                                                             </button>
-                                                        <?php elseif ($task['status'] === 'On Hold'): ?>
-                                                            <button onclick="removeFromHold(<?= $task['id'] ?>)" 
-                                                                    class="px-2 py-1 bg-green-500 text-white rounded text-xs hover:bg-green-600 transition-colors"
-                                                                    title="Remove from Hold">
-                                                                Resume
-                                                            </button>
                                                         <?php endif; ?>
                                                     </div>
                                                 </td>

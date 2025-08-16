@@ -368,12 +368,8 @@ function updateTaskStatus($pdo, $input) {
         ");
         $stmt->execute([$newStatus, $_SESSION['user_id'], $taskId]);
         
-        // Log status change
-        $stmt = $pdo->prepare("
-            INSERT INTO status_logs (task_id, status, updated_by, comments)
-            VALUES (?, ?, ?, ?)
-        ");
-        $stmt->execute([$taskId, $newStatus, $_SESSION['user_id'], $comments]);
+        // Status change logging is handled by database trigger
+        // which includes previous_status field automatically
         
         // Log activity
         $stmt = $pdo->prepare("
@@ -383,7 +379,11 @@ function updateTaskStatus($pdo, $input) {
         $stmt->execute([
             $_SESSION['user_id'],
             $taskId,
-            json_encode(['from' => $task['status'], 'to' => $newStatus])
+            json_encode([
+                'from' => $task['status'], 
+                'to' => $newStatus,
+                'comments' => $comments
+            ])
         ]);
         
         $pdo->commit();
@@ -435,12 +435,8 @@ function approveTask($pdo, $input) {
         ");
         $stmt->execute([$_SESSION['user_id'], $taskId]);
         
-        // Log status change
-        $stmt = $pdo->prepare("
-            INSERT INTO status_logs (task_id, status, updated_by, comments)
-            VALUES (?, 'Approved', ?, 'Task approved by administrator')
-        ");
-        $stmt->execute([$taskId, $_SESSION['user_id']]);
+        // Status change logging is handled by database trigger
+        // which includes previous_status field automatically
         
         $pdo->commit();
         
