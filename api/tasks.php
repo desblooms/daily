@@ -48,6 +48,7 @@ try {
             getTasks($pdo, $input);
             break;
             
+        case 'create':
         case 'create_task':
             createNewTask($pdo, $input);
             break;
