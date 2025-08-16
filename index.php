@@ -269,6 +269,13 @@ $notifications = getUserNotifications($_SESSION['user_id'], true, 5);
                                         Resume
                                     </button>
                                 <?php endif; ?>
+                                
+                                <!-- Request Reassignment -->
+                                <button onclick="event.stopPropagation(); requestReassignment(<?= $task['id'] ?>, '<?= htmlspecialchars($task['title'], ENT_QUOTES) ?>')" 
+                                        class="px-2 py-1 bg-purple-500 text-white text-xs rounded-lg hover:bg-purple-600 transition-colors" 
+                                        title="Request Reassignment">
+                                    <i class="fas fa-user-edit"></i>
+                                </button>
                             </div>
                             
                             <!-- View Detail Arrow -->
@@ -497,6 +504,62 @@ $notifications = getUserNotifications($_SESSION['user_id'], true, 5);
                 location.reload();
             }
         }, 120000);
+
+        function requestReassignment(taskId, taskTitle) {
+            const reason = prompt(`Request reassignment for "${taskTitle}"?\n\nPlease provide a reason (optional):`);
+            
+            // User cancelled
+            if (reason === null) return;
+            
+            // Add loading state to button
+            const button = event.target.closest('button');
+            const originalHTML = button.innerHTML;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            button.disabled = true;
+            
+            // Create notification for admins
+            fetch('api/notifications.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({
+                    action: 'create_admin_notification',
+                    title: 'Reassignment Request',
+                    message: `${window.userName} requests reassignment of task: "${taskTitle}"`,
+                    type: 'warning',
+                    related_type: 'task',
+                    related_id: taskId,
+                    details: {
+                        task_id: taskId,
+                        task_title: taskTitle,
+                        requester_id: window.userId,
+                        requester_name: window.userName,
+                        reason: reason || 'No reason provided',
+                        request_type: 'reassignment'
+                    }
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Reassignment request sent to administrators successfully!');
+                } else {
+                    alert('Error: ' + (data.message || 'Failed to send request'));
+                }
+                
+                // Restore button
+                button.innerHTML = originalHTML;
+                button.disabled = false;
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Network error. Please try again.');
+                
+                // Restore button
+                button.innerHTML = originalHTML;
+                button.disabled = false;
+            });
+        }
 
         // Show loading state on navigation
         document.querySelectorAll('a').forEach(link => {

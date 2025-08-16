@@ -532,6 +532,10 @@ $recentActivities = getRecentActivities(20);
                                                         class="p-2 text-gray-400 hover:text-purple-600 transition-colors">
                                                     <i class="fas fa-eye text-xs"></i>
                                                 </button>
+                                                <button onclick="openReassignModal(<?= $task['id'] ?>, '<?= htmlspecialchars($task['title'], ENT_QUOTES) ?>', <?= $task['assigned_to'] ?>)" 
+                                                        class="p-2 text-blue-400 hover:text-blue-600 transition-colors" title="Reassign Task">
+                                                    <i class="fas fa-user-edit text-xs"></i>
+                                                </button>
                                                 <?php if ($task['status'] === 'Done'): ?>
                                                     <button onclick="approveTask(<?= $task['id'] ?>)" 
                                                             class="p-2 text-green-500 hover:text-green-600 transition-colors">
@@ -603,6 +607,11 @@ $recentActivities = getRecentActivities(20);
                                                     class="flex-1 bg-blue-50 hover:bg-blue-100 text-blue-700 px-4 py-2 rounded-xl font-medium transition-colors text-sm">
                                                 <i class="fas fa-eye mr-2"></i>
                                                 View
+                                            </button>
+                                            <button onclick="openReassignModal(<?= $task['id'] ?>, '<?= htmlspecialchars($task['title'], ENT_QUOTES) ?>', <?= $task['assigned_to'] ?>)" 
+                                                    class="flex-1 bg-purple-50 hover:bg-purple-100 text-purple-700 px-4 py-2 rounded-xl font-medium transition-colors text-sm">
+                                                <i class="fas fa-user-edit mr-2"></i>
+                                                Reassign
                                             </button>
                                             <?php if ($task['status'] === 'Done'): ?>
                                                 <button onclick="approveTask(<?= $task['id'] ?>)" 
@@ -1081,7 +1090,267 @@ $recentActivities = getRecentActivities(20);
                 });
             }
         });
+
+        // Reassign Task Functions
+        let currentReassignTaskId = null;
+        let currentReassignTaskTitle = '';
+        let currentAssignedUserId = null;
+
+        function openReassignModal(taskId, taskTitle, currentUserId) {
+            currentReassignTaskId = taskId;
+            currentReassignTaskTitle = taskTitle;
+            currentAssignedUserId = currentUserId;
+            
+            // Update modal content
+            document.getElementById('reassignTaskTitle').textContent = taskTitle;
+            
+            // Find current assignee name
+            const userRadios = document.querySelectorAll('input[name="reassignUser"]');
+            let currentAssigneeName = 'Unknown';
+            
+            userRadios.forEach(radio => {
+                if (radio.value == currentUserId) {
+                    const label = radio.closest('label');
+                    currentAssigneeName = label.querySelector('.font-medium').textContent;
+                    radio.disabled = true; // Disable current assignee
+                    radio.closest('label').style.opacity = '0.5';
+                    radio.closest('label').style.pointerEvents = 'none';
+                } else {
+                    radio.disabled = false;
+                    radio.closest('label').style.opacity = '1';
+                    radio.closest('label').style.pointerEvents = 'auto';
+                }
+                radio.checked = false;
+            });
+            
+            document.getElementById('currentAssignee').textContent = currentAssigneeName;
+            document.getElementById('reassignReason').value = '';
+            
+            // Show modal
+            document.getElementById('reassignModal').classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeReassignModal() {
+            document.getElementById('reassignModal').classList.add('hidden');
+            document.body.style.overflow = 'auto';
+            
+            // Clear selections
+            const userRadios = document.querySelectorAll('input[name="reassignUser"]');
+            userRadios.forEach(radio => {
+                radio.checked = false;
+                radio.disabled = false;
+                radio.closest('label').style.opacity = '1';
+                radio.closest('label').style.pointerEvents = 'auto';
+            });
+            
+            currentReassignTaskId = null;
+            currentReassignTaskTitle = '';
+            currentAssignedUserId = null;
+        }
+
+        function confirmReassign() {
+            const selectedRadio = document.querySelector('input[name="reassignUser"]:checked');
+            
+            if (!selectedRadio) {
+                alert('Please select a user to reassign the task to.');
+                return;
+            }
+            
+            const newUserId = selectedRadio.value;
+            const reason = document.getElementById('reassignReason').value.trim();
+            
+            if (newUserId == currentAssignedUserId) {
+                alert('Please select a different user to reassign the task to.');
+                return;
+            }
+            
+            // Get new assignee name for confirmation
+            const newAssigneeName = selectedRadio.closest('label').querySelector('.font-medium').textContent;
+            
+            if (!confirm(`Are you sure you want to reassign "${currentReassignTaskTitle}" to ${newAssigneeName}?`)) {
+                return;
+            }
+            
+            // Show loading state
+            const confirmBtn = document.querySelector('#reassignModal button[onclick="confirmReassign()"]');
+            const originalText = confirmBtn.innerHTML;
+            confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Reassigning...';
+            confirmBtn.disabled = true;
+            
+            // Make API call
+            fetch('api/tasks.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify({
+                    action: 'update_task',
+                    task_id: currentReassignTaskId,
+                    assigned_to: newUserId,
+                    reassign_reason: reason || `Task reassigned to ${newAssigneeName}`
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Log the reassignment activity
+                    logReassignActivity(currentReassignTaskId, currentAssignedUserId, newUserId, reason);
+                    
+                    alert(`Task successfully reassigned to ${newAssigneeName}!`);
+                    closeReassignModal();
+                    location.reload(); // Refresh to show updated assignment
+                } else {
+                    alert('Error: ' + (data.message || 'Failed to reassign task'));
+                    confirmBtn.innerHTML = originalText;
+                    confirmBtn.disabled = false;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Network error. Please try again.');
+                confirmBtn.innerHTML = originalText;
+                confirmBtn.disabled = false;
+            });
+        }
+
+        function logReassignActivity(taskId, fromUserId, toUserId, reason) {
+            // Optional: Log reassignment as a separate activity
+            fetch('api/tasks.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify({
+                    action: 'log_activity',
+                    resource_type: 'task',
+                    resource_id: taskId,
+                    action_type: 'task_reassigned',
+                    details: {
+                        from_user: fromUserId,
+                        to_user: toUserId,
+                        reason: reason,
+                        task_title: currentReassignTaskTitle
+                    }
+                })
+            })
+            .catch(error => {
+                console.log('Activity logging failed:', error);
+            });
+        }
+
+        // Close modal when clicking outside
+        document.addEventListener('click', function(e) {
+            const modal = document.getElementById('reassignModal');
+            if (e.target === modal) {
+                closeReassignModal();
+            }
+        });
+
+        // Close modal on Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                const modal = document.getElementById('reassignModal');
+                if (!modal.classList.contains('hidden')) {
+                    closeReassignModal();
+                }
+            }
+        });
     </script>
+
+    <!-- Reassign Task Modal -->
+    <div id="reassignModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md transform transition-all">
+            <div class="p-6">
+                <!-- Modal Header -->
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-xl font-bold text-gray-900">Reassign Task</h3>
+                    <button onclick="closeReassignModal()" class="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                        <i class="fas fa-times text-gray-400"></i>
+                    </button>
+                </div>
+
+                <!-- Task Info -->
+                <div class="mb-6 p-4 bg-gray-50 rounded-xl">
+                    <div class="flex items-center gap-3 mb-2">
+                        <i class="fas fa-tasks text-purple-500"></i>
+                        <h4 id="reassignTaskTitle" class="font-semibold text-gray-900"></h4>
+                    </div>
+                    <div class="flex items-center gap-3 text-sm text-gray-600">
+                        <i class="fas fa-user"></i>
+                        <span>Currently assigned to: <span id="currentAssignee" class="font-medium"></span></span>
+                    </div>
+                </div>
+
+                <!-- User Selection -->
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-3">Reassign to:</label>
+                    <div class="space-y-2 max-h-64 overflow-y-auto">
+                        <?php foreach ($users as $user): ?>
+                            <label class="flex items-center p-3 rounded-xl hover:bg-gray-50 cursor-pointer transition-colors">
+                                <input type="radio" name="reassignUser" value="<?= $user['id'] ?>" 
+                                       class="sr-only reassign-radio">
+                                <div class="flex items-center gap-3 w-full">
+                                    <div class="w-10 h-10 bg-gradient-to-br from-purple-400 to-blue-500 rounded-xl flex items-center justify-center shadow-md">
+                                        <span class="text-white font-bold text-sm"><?= strtoupper(substr($user['name'], 0, 1)) ?></span>
+                                    </div>
+                                    <div class="flex-1">
+                                        <div class="font-medium text-gray-900"><?= htmlspecialchars($user['name']) ?></div>
+                                        <div class="text-sm text-gray-500"><?= htmlspecialchars($user['email']) ?></div>
+                                        <div class="text-xs text-gray-400"><?= ucfirst($user['role']) ?> • <?= htmlspecialchars($user['department'] ?? 'No Department') ?></div>
+                                    </div>
+                                    <div class="w-5 h-5 border-2 border-gray-300 rounded-full flex items-center justify-center radio-circle">
+                                        <div class="w-3 h-3 bg-purple-500 rounded-full hidden radio-dot"></div>
+                                    </div>
+                                </div>
+                            </label>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+
+                <!-- Reason (Optional) -->
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Reason for reassignment (optional):</label>
+                    <textarea id="reassignReason" placeholder="Enter reason for reassignment..." 
+                              class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 resize-none"
+                              rows="3"></textarea>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex gap-3">
+                    <button onclick="closeReassignModal()" 
+                            class="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-medium transition-colors">
+                        Cancel
+                    </button>
+                    <button onclick="confirmReassign()" 
+                            class="flex-1 px-4 py-3 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white rounded-xl font-medium transition-all shadow-lg">
+                        <i class="fas fa-user-edit mr-2"></i>
+                        Reassign Task
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        /* Custom radio button styling */
+        .reassign-radio:checked + div .radio-circle {
+            border-color: #7C3AED;
+            background-color: #7C3AED;
+        }
+        
+        .reassign-radio:checked + div .radio-dot {
+            display: block;
+            background-color: white;
+        }
+        
+        .reassign-radio:checked + div {
+            background-color: #F3F4F6;
+            border: 2px solid #7C3AED;
+        }
+    </style>
 </body>
 </html>
 

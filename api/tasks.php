@@ -283,6 +283,10 @@ function updateTask($pdo, $input) {
         // Build update query dynamically
         $updateFields = [];
         $params = [];
+        $changes = [];
+        $isReassignment = false;
+        $oldAssignedTo = $task['assigned_to'];
+        $newAssignedTo = null;
         
         $allowedFields = ['title', 'details', 'assigned_to', 'date', 'priority', 'estimated_hours', 'due_time'];
         
@@ -290,6 +294,13 @@ function updateTask($pdo, $input) {
             if (isset($input[$field])) {
                 $updateFields[] = "$field = ?";
                 $params[] = $input[$field];
+                $changes[$field] = ['from' => $task[$field], 'to' => $input[$field]];
+                
+                // Check if this is a reassignment
+                if ($field === 'assigned_to' && $input[$field] != $task[$field]) {
+                    $isReassignment = true;
+                    $newAssignedTo = $input[$field];
+                }
             }
         }
         
@@ -304,16 +315,73 @@ function updateTask($pdo, $input) {
             $stmt->execute($params);
         }
         
-        // Log activity
-        $stmt = $pdo->prepare("
-            INSERT INTO activity_logs (user_id, action, resource_type, resource_id, details)
-            VALUES (?, 'task_updated', 'task', ?, ?)
-        ");
-        $stmt->execute([
-            $_SESSION['user_id'],
-            $taskId,
-            json_encode(['changes' => array_keys($input)])
-        ]);
+        // Special logging for reassignment
+        if ($isReassignment) {
+            // Get user names for better logging
+            $stmt = $pdo->prepare("SELECT name FROM users WHERE id = ?");
+            $stmt->execute([$oldAssignedTo]);
+            $oldUserName = $stmt->fetchColumn() ?: 'Unknown';
+            
+            $stmt = $pdo->prepare("SELECT name FROM users WHERE id = ?");
+            $stmt->execute([$newAssignedTo]);
+            $newUserName = $stmt->fetchColumn() ?: 'Unknown';
+            
+            // Log reassignment activity
+            $stmt = $pdo->prepare("
+                INSERT INTO activity_logs (user_id, action, resource_type, resource_id, details)
+                VALUES (?, 'task_reassigned', 'task', ?, ?)
+            ");
+            $stmt->execute([
+                $_SESSION['user_id'],
+                $taskId,
+                json_encode([
+                    'from_user' => $oldAssignedTo,
+                    'to_user' => $newAssignedTo,
+                    'from_user_name' => $oldUserName,
+                    'to_user_name' => $newUserName,
+                    'reason' => $input['reassign_reason'] ?? 'Task reassigned',
+                    'task_title' => $task['title']
+                ])
+            ]);
+            
+            // Create notifications for both users
+            require_once '../includes/functions.php';
+            
+            // Notify the new assignee
+            if ($newAssignedTo != $_SESSION['user_id']) {
+                createNotification(
+                    $newAssignedTo, 
+                    'Task Assigned to You', 
+                    "You have been assigned the task: " . $task['title'], 
+                    'info', 
+                    'task', 
+                    $taskId
+                );
+            }
+            
+            // Notify the previous assignee if different from current user
+            if ($oldAssignedTo != $_SESSION['user_id'] && $oldAssignedTo != $newAssignedTo) {
+                createNotification(
+                    $oldAssignedTo, 
+                    'Task Reassigned', 
+                    "The task '" . $task['title'] . "' has been reassigned to " . $newUserName, 
+                    'info', 
+                    'task', 
+                    $taskId
+                );
+            }
+        } else {
+            // Regular update logging
+            $stmt = $pdo->prepare("
+                INSERT INTO activity_logs (user_id, action, resource_type, resource_id, details)
+                VALUES (?, 'task_updated', 'task', ?, ?)
+            ");
+            $stmt->execute([
+                $_SESSION['user_id'],
+                $taskId,
+                json_encode(['changes' => array_keys($input)])
+            ]);
+        }
         
         $pdo->commit();
         
