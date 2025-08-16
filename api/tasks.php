@@ -374,7 +374,7 @@ function updateTaskStatus($pdo, $input) {
         // Log activity
         $stmt = $pdo->prepare("
             INSERT INTO activity_logs (user_id, action, resource_type, resource_id, details)
-            VALUES (?, 'status_changed', 'task', ?, ?)
+            VALUES (?, 'Status Changed', 'task', ?, ?)
         ");
         $stmt->execute([
             $_SESSION['user_id'],

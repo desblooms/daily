@@ -27,7 +27,16 @@ try {
         exit;
     }
     
-    $action = $_GET['action'] ?? $_POST['action'] ?? '';
+    // Get input data first
+    $input = [];
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $input = json_decode(file_get_contents('php://input'), true) ?? $_POST;
+    } else {
+        $input = $_GET;
+    }
+    
+    // Get action from input data or fallback to GET/POST
+    $action = $input['action'] ?? $_GET['action'] ?? $_POST['action'] ?? '';
     
     switch ($action) {
         case 'get_active_users':
@@ -48,6 +57,26 @@ try {
             
         case 'get_user_stats':
             getUserStats($pdo);
+            break;
+            
+        case 'create_user':
+            createUser($pdo, $input);
+            break;
+            
+        case 'delete_user':
+            deleteUser($pdo, $input);
+            break;
+            
+        case 'toggle_user_status':
+            toggleUserStatus($pdo, $input);
+            break;
+            
+        case 'reset_password':
+            resetUserPassword($pdo, $input);
+            break;
+            
+        case 'get_all_users':
+            getAllUsers($pdo, $input);
             break;
             
         default:
@@ -315,6 +344,302 @@ function getUserStats($pdo) {
             'message' => 'Failed to fetch user statistics',
             'debug' => $e->getMessage()
         ]);
+    }
+}
+
+function createUser($pdo, $input) {
+    // Check admin access
+    if ($_SESSION['role'] !== 'admin') {
+        echo json_encode(['success' => false, 'message' => 'Admin access required']);
+        return;
+    }
+    
+    $required = ['name', 'email', 'password'];
+    foreach ($required as $field) {
+        if (empty($input[$field])) {
+            echo json_encode(['success' => false, 'message' => "Missing required field: {$field}"]);
+            return;
+        }
+    }
+    
+    // Validate email
+    if (!filter_var($input['email'], FILTER_VALIDATE_EMAIL)) {
+        echo json_encode(['success' => false, 'message' => 'Invalid email address']);
+        return;
+    }
+    
+    // Check if email already exists
+    $stmt = $pdo->prepare("SELECT id FROM users WHERE email = ?");
+    $stmt->execute([$input['email']]);
+    if ($stmt->fetch()) {
+        echo json_encode(['success' => false, 'message' => 'Email address already exists']);
+        return;
+    }
+    
+    try {
+        $pdo->beginTransaction();
+        
+        $hashedPassword = password_hash($input['password'], PASSWORD_DEFAULT);
+        
+        $stmt = $pdo->prepare("
+            INSERT INTO users (name, email, password, role, department, phone, is_active)
+            VALUES (?, ?, ?, ?, ?, ?, TRUE)
+        ");
+        
+        $result = $stmt->execute([
+            trim($input['name']),
+            trim($input['email']),
+            $hashedPassword,
+            $input['role'] ?? 'user',
+            $input['department'] ?? null,
+            $input['phone'] ?? null
+        ]);
+        
+        if (!$result) {
+            throw new Exception('Failed to create user');
+        }
+        
+        $userId = $pdo->lastInsertId();
+        
+        // Log activity using existing function
+        require_once '../includes/functions.php';
+        logActivity($_SESSION['user_id'], 'user_created', 'user', $userId, [
+            'name' => $input['name'],
+            'email' => $input['email'],
+            'role' => $input['role'] ?? 'user'
+        ]);
+        
+        $pdo->commit();
+        
+        echo json_encode([
+            'success' => true, 
+            'message' => 'User created successfully',
+            'user_id' => $userId
+        ]);
+        
+    } catch (Exception $e) {
+        $pdo->rollback();
+        echo json_encode(['success' => false, 'message' => 'Failed to create user: ' . $e->getMessage()]);
+    }
+}
+
+function deleteUser($pdo, $input) {
+    // Check admin access
+    if ($_SESSION['role'] !== 'admin') {
+        echo json_encode(['success' => false, 'message' => 'Admin access required']);
+        return;
+    }
+    $userId = $input['user_id'] ?? null;
+    
+    if (!$userId) {
+        echo json_encode(['success' => false, 'message' => 'Missing user ID']);
+        return;
+    }
+    
+    // Prevent admin from deleting themselves
+    if ($userId == $_SESSION['user_id']) {
+        echo json_encode(['success' => false, 'message' => 'Cannot delete your own account']);
+        return;
+    }
+    
+    // Check if user exists
+    $stmt = $pdo->prepare("SELECT name FROM users WHERE id = ?");
+    $stmt->execute([$userId]);
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$user) {
+        echo json_encode(['success' => false, 'message' => 'User not found']);
+        return;
+    }
+    
+    // Check if user has active tasks
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM tasks WHERE assigned_to = ? AND status NOT IN ('Done', 'Approved')");
+    $stmt->execute([$userId]);
+    $activeTasks = $stmt->fetchColumn();
+    
+    if ($activeTasks > 0) {
+        echo json_encode(['success' => false, 'message' => 'Cannot delete user with active tasks. Please reassign or complete their tasks first.']);
+        return;
+    }
+    
+    try {
+        $pdo->beginTransaction();
+        
+        // Soft delete - mark as inactive instead of actual deletion
+        $stmt = $pdo->prepare("UPDATE users SET is_active = FALSE, updated_at = NOW() WHERE id = ?");
+        $stmt->execute([$userId]);
+        
+        // Log activity
+        require_once '../includes/functions.php';
+        logActivity($_SESSION['user_id'], 'user_deleted', 'user', $userId, [
+            'name' => $user['name']
+        ]);
+        
+        $pdo->commit();
+        
+        echo json_encode(['success' => true, 'message' => 'User deactivated successfully']);
+        
+    } catch (Exception $e) {
+        $pdo->rollback();
+        echo json_encode(['success' => false, 'message' => 'Failed to delete user: ' . $e->getMessage()]);
+    }
+}
+
+function toggleUserStatus($pdo, $input) {
+    // Check admin access
+    if ($_SESSION['role'] !== 'admin') {
+        echo json_encode(['success' => false, 'message' => 'Admin access required']);
+        return;
+    }
+    $userId = $input['user_id'] ?? null;
+    
+    if (!$userId) {
+        echo json_encode(['success' => false, 'message' => 'Missing user ID']);
+        return;
+    }
+    
+    // Prevent admin from deactivating themselves
+    if ($userId == $_SESSION['user_id']) {
+        echo json_encode(['success' => false, 'message' => 'Cannot modify your own account status']);
+        return;
+    }
+    
+    try {
+        $pdo->beginTransaction();
+        
+        // Get current status
+        $stmt = $pdo->prepare("SELECT is_active, name FROM users WHERE id = ?");
+        $stmt->execute([$userId]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$user) {
+            echo json_encode(['success' => false, 'message' => 'User not found']);
+            return;
+        }
+        
+        $newStatus = !$user['is_active'];
+        
+        $stmt = $pdo->prepare("UPDATE users SET is_active = ?, updated_at = NOW() WHERE id = ?");
+        $stmt->execute([$newStatus, $userId]);
+        
+        // Log activity
+        require_once '../includes/functions.php';
+        logActivity($_SESSION['user_id'], 'user_status_changed', 'user', $userId, [
+            'name' => $user['name'],
+            'from' => $user['is_active'] ? 'active' : 'inactive',
+            'to' => $newStatus ? 'active' : 'inactive'
+        ]);
+        
+        $pdo->commit();
+        
+        $statusText = $newStatus ? 'activated' : 'deactivated';
+        echo json_encode(['success' => true, 'message' => "User {$statusText} successfully"]);
+        
+    } catch (Exception $e) {
+        $pdo->rollback();
+        echo json_encode(['success' => false, 'message' => 'Failed to update user status: ' . $e->getMessage()]);
+    }
+}
+
+function resetUserPassword($pdo, $input) {
+    // Check admin access
+    if ($_SESSION['role'] !== 'admin') {
+        echo json_encode(['success' => false, 'message' => 'Admin access required']);
+        return;
+    }
+    $userId = $input['user_id'] ?? null;
+    $newPassword = $input['password'] ?? null;
+    
+    if (!$userId || !$newPassword) {
+        echo json_encode(['success' => false, 'message' => 'Missing user ID or password']);
+        return;
+    }
+    
+    try {
+        $pdo->beginTransaction();
+        
+        // Get user info
+        $stmt = $pdo->prepare("SELECT name FROM users WHERE id = ?");
+        $stmt->execute([$userId]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$user) {
+            echo json_encode(['success' => false, 'message' => 'User not found']);
+            return;
+        }
+        
+        $hashedPassword = password_hash($newPassword, PASSWORD_DEFAULT);
+        
+        $stmt = $pdo->prepare("UPDATE users SET password = ?, force_password_change = TRUE, updated_at = NOW() WHERE id = ?");
+        $stmt->execute([$hashedPassword, $userId]);
+        
+        // Log activity
+        require_once '../includes/functions.php';
+        logActivity($_SESSION['user_id'], 'password_reset', 'user', $userId, [
+            'name' => $user['name']
+        ]);
+        
+        $pdo->commit();
+        
+        echo json_encode(['success' => true, 'message' => 'Password reset successfully. User will be prompted to change it on next login.']);
+        
+    } catch (Exception $e) {
+        $pdo->rollback();
+        echo json_encode(['success' => false, 'message' => 'Failed to reset password: ' . $e->getMessage()]);
+    }
+}
+
+function getAllUsers($pdo, $input) {
+    // Check admin access
+    if ($_SESSION['role'] !== 'admin') {
+        echo json_encode(['success' => false, 'message' => 'Admin access required']);
+        return;
+    }
+    
+    try {
+        $includeInactive = $input['include_inactive'] ?? false;
+        $search = $input['search'] ?? '';
+        
+        $sql = "
+            SELECT 
+                u.*,
+                COUNT(t.id) as total_tasks,
+                SUM(CASE WHEN t.status IN ('Done', 'Approved') THEN 1 ELSE 0 END) as completed_tasks,
+                SUM(CASE WHEN t.status = 'Pending' THEN 1 ELSE 0 END) as pending_tasks,
+                SUM(CASE WHEN t.status = 'On Progress' THEN 1 ELSE 0 END) as active_tasks
+            FROM users u
+            LEFT JOIN tasks t ON u.id = t.assigned_to
+            WHERE 1=1
+        ";
+        
+        $params = [];
+        
+        if (!$includeInactive) {
+            $sql .= " AND u.is_active = TRUE";
+        }
+        
+        if ($search) {
+            $sql .= " AND (u.name LIKE ? OR u.email LIKE ? OR u.department LIKE ?)";
+            $searchParam = '%' . $search . '%';
+            $params[] = $searchParam;
+            $params[] = $searchParam;
+            $params[] = $searchParam;
+        }
+        
+        $sql .= " GROUP BY u.id ORDER BY u.name";
+        
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        echo json_encode([
+            'success' => true,
+            'users' => $users,
+            'count' => count($users)
+        ]);
+        
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'message' => 'Failed to fetch users: ' . $e->getMessage()]);
     }
 }
 ?>

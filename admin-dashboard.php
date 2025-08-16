@@ -149,11 +149,11 @@ $recentActivities = getRecentActivities(20);
                     <span class="font-medium">Analytics</span>
                 </a>
 
-                <a href="?view=users" class="nav-item flex items-center space-x-3 p-3 rounded-xl transition-all <?= $currentView === 'users' ? 'bg-purple-50 text-purple-700 border-l-4 border-purple-500' : 'text-gray-600 hover:bg-gray-50' ?>">
+                <a href="members.php" class="nav-item flex items-center space-x-3 p-3 rounded-xl transition-all text-gray-600 hover:bg-gray-50">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path>
                     </svg>
-                    <span class="font-medium">Team Members</span>
+                    <span class="font-medium">Manage Members</span>
                 </a>
 
                 <a href="admin-password-management.php" class="nav-item flex items-center space-x-3 p-3 rounded-xl transition-all text-gray-600 hover:bg-gray-50">
@@ -381,94 +381,259 @@ $recentActivities = getRecentActivities(20);
                         </div>
 
                     <?php elseif ($currentView === 'tasks'): ?>
-                        <!-- Task Management View -->
-                        <div class="bg-white rounded-2xl shadow-sm border">
-                            <div class="p-6 border-b border-gray-200">
-                                <div class="flex flex-col md:flex-row md:items-center justify-between space-y-4 md:space-y-0">
-                                    <h3 class="text-lg font-semibold text-gray-900">Task Management</h3>
-                                    <div class="flex items-center space-x-4">
-                                        <select class="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
-                                            <option>All Status</option>
-                                            <option>Pending</option>
-                                            <option>On Progress</option>
-                                            <option>Done</option>
-                                            <option>Approved</option>
-                                            <option>On Hold</option>
-                                        </select>
-                                        <button onclick="globalTaskManager.openAddTaskModal()" class="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors">
-                                            + Add Task
+                        <!-- Modern Task Management View -->
+                        <div class="space-y-4 lg:space-y-6">
+                            <!-- Mobile Header -->
+                            <div class="lg:hidden">
+                                <div class="bg-white rounded-xl p-4 shadow-sm border">
+                                    <div class="flex items-center justify-between mb-4">
+                                        <div>
+                                            <h3 class="text-lg font-bold text-gray-900">Tasks</h3>
+                                            <p class="text-sm text-gray-500"><?= count($todayTasks) ?> tasks for <?= date('M j', strtotime($selectedDate)) ?></p>
+                                        </div>
+                                        <button onclick="globalTaskManager.openAddTaskModal()" class="bg-gradient-to-r from-purple-500 to-blue-500 text-white p-3 rounded-xl shadow-lg">
+                                            <i class="fas fa-plus text-sm"></i>
+                                        </button>
+                                    </div>
+                                    
+                                    <!-- Mobile Filters -->
+                                    <div class="flex gap-2 overflow-x-auto pb-2">
+                                        <button onclick="filterTasksByStatus('all')" class="filter-btn active flex-shrink-0 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-xs font-medium">
+                                            All
+                                        </button>
+                                        <button onclick="filterTasksByStatus('Pending')" class="filter-btn flex-shrink-0 px-3 py-2 bg-yellow-50 text-yellow-700 rounded-lg text-xs font-medium">
+                                            Pending
+                                        </button>
+                                        <button onclick="filterTasksByStatus('On Progress')" class="filter-btn flex-shrink-0 px-3 py-2 bg-blue-50 text-blue-700 rounded-lg text-xs font-medium">
+                                            Active
+                                        </button>
+                                        <button onclick="filterTasksByStatus('Done')" class="filter-btn flex-shrink-0 px-3 py-2 bg-green-50 text-green-700 rounded-lg text-xs font-medium">
+                                            Done
+                                        </button>
+                                        <button onclick="filterTasksByStatus('On Hold')" class="filter-btn flex-shrink-0 px-3 py-2 bg-red-50 text-red-700 rounded-lg text-xs font-medium">
+                                            Hold
                                         </button>
                                     </div>
                                 </div>
                             </div>
-                            
-                            <div class="overflow-x-auto">
-                                <table class="w-full">
-                                    <thead class="bg-gray-50 border-b border-gray-200">
-                                        <tr>
-                                            <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Task</th>
-                                            <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assigned To</th>
-                                            <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                            <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                                            <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="bg-white divide-y divide-gray-200">
-                                        <?php foreach ($todayTasks as $task): ?>
-                                            <tr class="hover:bg-gray-50 transition-colors">
-                                                <td class="px-6 py-4">
-                                                    <div>
-                                                        <p class="font-medium text-gray-900"><?= htmlspecialchars($task['title']) ?></p>
-                                                        <?php if (!empty($task['details'])): ?>
-                                                            <p class="text-sm text-gray-500"><?= htmlspecialchars(substr($task['details'], 0, 50)) ?>...</p>
-                                                        <?php endif; ?>
-                                                    </div>
-                                                </td>
-                                                <td class="px-6 py-4">
-                                                    <div class="flex items-center">
-                                                        <div class="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center mr-3">
-                                                            <span class="text-white font-semibold text-xs"><?= strtoupper(substr($task['assigned_name'], 0, 2)) ?></span>
-                                                        </div>
-                                                        <span class="text-sm text-gray-900"><?= htmlspecialchars($task['assigned_name']) ?></span>
-                                                    </div>
-                                                </td>
-                                                <td class="px-6 py-4">
-                                                    <span class="px-3 py-1 text-xs rounded-full font-medium <?= getStatusStyle($task['status']) ?>">
+
+                            <!-- Desktop Header -->
+                            <div class="hidden lg:block">
+                                <div class="bg-gradient-to-r from-purple-50 to-blue-50 rounded-2xl p-6 border border-purple-100">
+                                    <div class="flex items-center justify-between mb-6">
+                                        <div>
+                                            <h3 class="text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">Task Management</h3>
+                                            <p class="text-gray-600 mt-1">Manage and track team tasks efficiently</p>
+                                        </div>
+                                        <div class="flex items-center gap-4">
+                                            <div class="flex items-center gap-2 px-4 py-2 bg-white rounded-xl shadow-sm">
+                                                <i class="fas fa-calendar text-purple-500"></i>
+                                                <input type="date" value="<?= $selectedDate ?>" onchange="changeDate(this.value)" 
+                                                       class="border-none outline-none text-sm font-medium">
+                                            </div>
+                                            <button onclick="globalTaskManager.openAddTaskModal()" 
+                                                    class="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white px-6 py-3 rounded-xl font-medium shadow-lg hover:shadow-xl transition-all">
+                                                <i class="fas fa-plus mr-2"></i>
+                                                Add Task
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Desktop Filters -->
+                                    <div class="flex items-center gap-4 flex-wrap">
+                                        <!-- Search Input -->
+                                        <div class="flex items-center gap-2">
+                                            <label class="text-sm font-medium text-gray-700">Search:</label>
+                                            <div class="relative">
+                                                <input type="text" id="taskSearch" placeholder="Search tasks..."
+                                                       class="px-4 py-2 pl-10 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 w-64">
+                                                <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="flex items-center gap-2">
+                                            <label class="text-sm font-medium text-gray-700">Filter:</label>
+                                            <select id="statusFilter" onchange="filterTasksByStatus(this.value)" 
+                                                    class="px-4 py-2 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                                <option value="all">All Status</option>
+                                                <option value="Pending">Pending</option>
+                                                <option value="On Progress">On Progress</option>
+                                                <option value="Done">Done</option>
+                                                <option value="Approved">Approved</option>
+                                                <option value="On Hold">On Hold</option>
+                                            </select>
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <label class="text-sm font-medium text-gray-700">Assignee:</label>
+                                            <select id="userFilter" onchange="filterTasksByUser(this.value)"
+                                                    class="px-4 py-2 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                                <option value="all">All Users</option>
+                                                <?php foreach ($users as $user): ?>
+                                                    <option value="<?= $user['id'] ?>" <?= isset($_GET['user_id']) && $_GET['user_id'] == $user['id'] ? 'selected' : '' ?>>
+                                                        <?= htmlspecialchars($user['name']) ?>
+                                                    </option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <label class="text-sm font-medium text-gray-700">Priority:</label>
+                                            <select id="priorityFilter" onchange="filterTasksByPriority(this.value)"
+                                                    class="px-4 py-2 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                                <option value="all">All Priorities</option>
+                                                <option value="high">High</option>
+                                                <option value="medium">Medium</option>
+                                                <option value="low">Low</option>
+                                            </select>
+                                        </div>
+                                        
+                                        <!-- Clear Filters Button -->
+                                        <button onclick="clearAllFilters()" 
+                                                class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-medium transition-colors">
+                                            <i class="fas fa-times mr-2"></i>
+                                            Clear Filters
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Mobile Task Cards -->
+                            <div id="mobileTaskGrid" class="lg:hidden space-y-3">
+                                <?php foreach ($todayTasks as $task): ?>
+                                    <div class="task-card bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:border-purple-200 transition-all"
+                                         data-status="<?= $task['status'] ?>" 
+                                         data-user="<?= $task['assigned_to'] ?>"
+                                         data-priority="<?= $task['priority'] ?>">
+                                        
+                                        <!-- Mobile Card Content -->
+                                        <div class="flex items-start justify-between mb-3">
+                                            <div class="flex-1 min-w-0">
+                                                <h4 class="font-semibold text-gray-900 text-sm truncate mb-1"><?= htmlspecialchars($task['title']) ?></h4>
+                                                <div class="flex items-center gap-2 mb-2">
+                                                    <span class="px-2 py-1 text-xs rounded-lg font-medium <?= getStatusStyle($task['status']) ?>">
                                                         <?= $task['status'] ?>
                                                     </span>
-                                                </td>
-                                                <td class="px-6 py-4 text-sm text-gray-500">
-                                                    <?= date('M j, Y', strtotime($task['date'])) ?>
-                                                </td>
-                                                <td class="px-6 py-4">
-                                                    <div class="flex items-center space-x-2">
-                                                        <button onclick="viewTask(<?= $task['id'] ?>)" 
-                                                                class="p-1 text-gray-400 hover:text-gray-600 transition-colors"
-                                                                title="View Task">
-                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-                                                            </svg>
-                                                        </button>
-                                                        <button onclick="globalTaskManager.deleteTask(<?= $task['id'] ?>, '<?= htmlspecialchars($task['title'], ENT_QUOTES) ?>')" 
-                                                                class="p-1 text-red-400 hover:text-red-600 transition-colors"
-                                                                title="Delete Task">
-                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                                                            </svg>
-                                                        </button>
-                                                        <?php if ($task['status'] === 'Done'): ?>
-                                                            <button onclick="approveTask(<?= $task['id'] ?>)" 
-                                                                    class="px-2 py-1 bg-purple-500 text-white rounded text-xs hover:bg-purple-600 transition-colors">
-                                                                Approve
-                                                            </button>
-                                                        <?php endif; ?>
+                                                    <span class="px-2 py-1 text-xs rounded-lg bg-gray-100 text-gray-600">
+                                                        <?= ucfirst($task['priority']) ?>
+                                                    </span>
+                                                </div>
+                                                <div class="flex items-center gap-2 text-xs text-gray-500">
+                                                    <div class="w-5 h-5 bg-gradient-to-br from-purple-400 to-blue-500 rounded-full flex items-center justify-center">
+                                                        <span class="text-white font-bold text-xs"><?= strtoupper(substr($task['assigned_name'], 0, 1)) ?></span>
                                                     </div>
-                                                </td>
-                                            </tr>
-                                        <?php endforeach; ?>
-                                    </tbody>
-                                </table>
+                                                    <span><?= htmlspecialchars($task['assigned_name']) ?></span>
+                                                    <span>•</span>
+                                                    <span><?= date('M j', strtotime($task['date'])) ?></span>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Mobile Actions -->
+                                            <div class="flex gap-1">
+                                                <button onclick="viewTask(<?= $task['id'] ?>)" 
+                                                        class="p-2 text-gray-400 hover:text-purple-600 transition-colors">
+                                                    <i class="fas fa-eye text-xs"></i>
+                                                </button>
+                                                <?php if ($task['status'] === 'Done'): ?>
+                                                    <button onclick="approveTask(<?= $task['id'] ?>)" 
+                                                            class="p-2 text-green-500 hover:text-green-600 transition-colors">
+                                                        <i class="fas fa-check text-xs"></i>
+                                                    </button>
+                                                <?php endif; ?>
+                                                <button onclick="globalTaskManager.deleteTask(<?= $task['id'] ?>, '<?= htmlspecialchars($task['title'], ENT_QUOTES) ?>')" 
+                                                        class="p-2 text-red-400 hover:text-red-600 transition-colors">
+                                                    <i class="fas fa-trash text-xs"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        
+                                        <?php if (!empty($task['details'])): ?>
+                                            <p class="text-xs text-gray-600 line-clamp-2"><?= htmlspecialchars(substr($task['details'], 0, 80)) ?>...</p>
+                                        <?php endif; ?>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+
+                            <!-- Desktop Task Cards -->
+                            <div id="desktopTaskGrid" class="hidden lg:grid grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3 gap-6">
+                                <?php foreach ($todayTasks as $task): ?>
+                                    <div class="task-card bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:border-purple-200 hover:shadow-lg transition-all duration-300"
+                                         data-status="<?= $task['status'] ?>"
+                                         data-user="<?= $task['assigned_to'] ?>"
+                                         data-priority="<?= $task['priority'] ?>">
+                                        
+                                        <!-- Desktop Card Header -->
+                                        <div class="flex items-start justify-between mb-4">
+                                            <div class="flex-1 min-w-0">
+                                                <h4 class="font-bold text-gray-900 text-lg mb-2 line-clamp-2"><?= htmlspecialchars($task['title']) ?></h4>
+                                                <div class="flex items-center gap-3 mb-3">
+                                                    <span class="px-3 py-1 text-sm rounded-full font-medium <?= getStatusStyle($task['status']) ?>">
+                                                        <?= $task['status'] ?>
+                                                    </span>
+                                                    <span class="px-3 py-1 text-sm rounded-full bg-gray-100 text-gray-700 font-medium">
+                                                        <?= ucfirst($task['priority']) ?> Priority
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Desktop Task Details -->
+                                        <?php if (!empty($task['details'])): ?>
+                                            <p class="text-gray-600 text-sm mb-4 line-clamp-3"><?= htmlspecialchars($task['details']) ?></p>
+                                        <?php endif; ?>
+
+                                        <!-- Desktop Assignee & Date -->
+                                        <div class="flex items-center justify-between mb-4 p-3 bg-gray-50 rounded-xl">
+                                            <div class="flex items-center gap-3">
+                                                <div class="w-10 h-10 bg-gradient-to-br from-purple-400 to-blue-500 rounded-xl flex items-center justify-center shadow-md">
+                                                    <span class="text-white font-bold"><?= strtoupper(substr($task['assigned_name'], 0, 1)) ?></span>
+                                                </div>
+                                                <div>
+                                                    <div class="font-medium text-gray-900 text-sm"><?= htmlspecialchars($task['assigned_name']) ?></div>
+                                                    <div class="text-xs text-gray-500">Assignee</div>
+                                                </div>
+                                            </div>
+                                            <div class="text-right">
+                                                <div class="font-medium text-gray-900 text-sm"><?= date('M j, Y', strtotime($task['date'])) ?></div>
+                                                <div class="text-xs text-gray-500">Due Date</div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Desktop Actions -->
+                                        <div class="flex gap-2">
+                                            <button onclick="viewTask(<?= $task['id'] ?>)" 
+                                                    class="flex-1 bg-blue-50 hover:bg-blue-100 text-blue-700 px-4 py-2 rounded-xl font-medium transition-colors text-sm">
+                                                <i class="fas fa-eye mr-2"></i>
+                                                View
+                                            </button>
+                                            <?php if ($task['status'] === 'Done'): ?>
+                                                <button onclick="approveTask(<?= $task['id'] ?>)" 
+                                                        class="flex-1 bg-green-50 hover:bg-green-100 text-green-700 px-4 py-2 rounded-xl font-medium transition-colors text-sm">
+                                                    <i class="fas fa-check mr-2"></i>
+                                                    Approve
+                                                </button>
+                                            <?php endif; ?>
+                                            <button onclick="globalTaskManager.deleteTask(<?= $task['id'] ?>, '<?= htmlspecialchars($task['title'], ENT_QUOTES) ?>')" 
+                                                    class="bg-red-50 hover:bg-red-100 text-red-700 px-3 py-2 rounded-xl transition-colors text-sm">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+
+                            <!-- No Tasks Message -->
+                            <div id="noTasksMessage" class="hidden text-center py-12">
+                                <div class="max-w-md mx-auto">
+                                    <div class="w-20 h-20 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                                        <i class="fas fa-tasks text-gray-400 text-2xl"></i>
+                                    </div>
+                                    <h3 class="text-lg font-semibold text-gray-900 mb-2">No tasks found</h3>
+                                    <p class="text-gray-600 mb-4">Try adjusting your filters or create a new task</p>
+                                    <button onclick="globalTaskManager.openAddTaskModal()" 
+                                            class="bg-gradient-to-r from-purple-500 to-blue-500 text-white px-6 py-3 rounded-xl font-medium">
+                                        <i class="fas fa-plus mr-2"></i>
+                                        Add New Task
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
@@ -490,48 +655,6 @@ $recentActivities = getRecentActivities(20);
                             </div>
                         
 
-                    <?php elseif ($currentView === 'users'): ?>
-                        <!-- Users Management View -->
-                        <div class="bg-white rounded-2xl shadow-sm border">
-                            <div class="p-6 border-b border-gray-200">
-                                <div class="flex items-center justify-between">
-                                    <h3 class="text-lg font-semibold text-gray-900">Team Members</h3>
-                                    <button class="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors">
-                                        + Add Member
-                                    </button>
-                                </div>
-                            </div>
-                            
-                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-6">
-                                <?php foreach ($users as $user): ?>
-                                    <div class="bg-gray-50 rounded-xl p-6 hover:shadow-md transition-all">
-                                        <div class="text-center">
-                                            <div class="w-16 h-16 bg-gradient-to-r from-purple-400 to-blue-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                                                <span class="text-white font-bold text-lg"><?= strtoupper(substr($user['name'], 0, 2)) ?></span>
-                                            </div>
-                                            <h4 class="font-semibold text-gray-900 mb-1"><?= htmlspecialchars($user['name']) ?></h4>
-                                            <p class="text-sm text-gray-500 mb-2"><?= htmlspecialchars($user['email']) ?></p>
-                                            <span class="px-3 py-1 text-xs rounded-full font-medium <?= $user['role'] === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700' ?>">
-                                                <?= ucfirst($user['role']) ?>
-                                            </span>
-                                            
-                                            <div class="mt-4 pt-4 border-t border-gray-200">
-                                                <div class="grid grid-cols-2 gap-4 text-center">
-                                                    <div>
-                                                        <p class="text-lg font-bold text-gray-900"><?= getUserTaskCount($user['id'], 'completed') ?></p>
-                                                        <p class="text-xs text-gray-500">Completed</p>
-                                                    </div>
-                                                    <div>
-                                                        <p class="text-lg font-bold text-gray-900"><?= getUserTaskCount($user['id'], 'pending') ?></p>
-                                                        <p class="text-xs text-gray-500">Pending</p>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                <?php endforeach; ?>
-                            </div>
-                        </div>
                     <?php endif; ?>
                 </div>
             </div>
@@ -562,11 +685,11 @@ $recentActivities = getRecentActivities(20);
                 <span class="text-xs font-medium">Analytics</span>
             </a>
             
-            <a href="?view=users" class="flex flex-col items-center space-y-1 p-2 <?= $currentView === 'users' ? 'text-purple-600' : 'text-gray-400' ?>">
+            <a href="members.php" class="flex flex-col items-center space-y-1 p-2 text-gray-400">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path>
                 </svg>
-                <span class="text-xs font-medium">Team</span>
+                <span class="text-xs font-medium">Members</span>
             </a>
         </div>
     </nav>
@@ -788,6 +911,176 @@ $recentActivities = getRecentActivities(20);
                 }
             }
         }
+
+        // Task Filtering Functions
+        let currentFilters = {
+            status: 'all',
+            user: 'all',
+            priority: 'all'
+        };
+
+        function filterTasksByStatus(status) {
+            currentFilters.status = status;
+            applyFilters();
+            updateActiveFilterButtons('status', status);
+        }
+
+        function filterTasksByUser(userId) {
+            currentFilters.user = userId;
+            applyFilters();
+        }
+
+        function filterTasksByPriority(priority) {
+            currentFilters.priority = priority;
+            applyFilters();
+        }
+
+        function applyFilters() {
+            const mobileCards = document.querySelectorAll('#mobileTaskGrid .task-card');
+            const desktopCards = document.querySelectorAll('#desktopTaskGrid .task-card');
+            
+            [...mobileCards, ...desktopCards].forEach(card => {
+                let visible = true;
+                
+                // Status filter
+                if (currentFilters.status !== 'all') {
+                    const cardStatus = card.getAttribute('data-status');
+                    if (cardStatus !== currentFilters.status) {
+                        visible = false;
+                    }
+                }
+                
+                // User filter
+                if (currentFilters.user !== 'all') {
+                    const cardUser = card.getAttribute('data-user');
+                    if (cardUser !== currentFilters.user) {
+                        visible = false;
+                    }
+                }
+                
+                // Priority filter
+                if (currentFilters.priority !== 'all') {
+                    const cardPriority = card.getAttribute('data-priority');
+                    if (cardPriority !== currentFilters.priority) {
+                        visible = false;
+                    }
+                }
+                
+                // Apply visibility
+                if (visible) {
+                    card.style.display = 'block';
+                    card.classList.remove('hidden');
+                } else {
+                    card.style.display = 'none';
+                    card.classList.add('hidden');
+                }
+            });
+            
+            updateTaskCount();
+        }
+
+        function updateActiveFilterButtons(filterType, value) {
+            if (filterType === 'status') {
+                // Update mobile filter buttons
+                const mobileButtons = document.querySelectorAll('.filter-btn');
+                mobileButtons.forEach(btn => {
+                    btn.classList.remove('active', 'bg-purple-100', 'text-purple-700');
+                    if (btn.onclick.toString().includes(`'${value}'`)) {
+                        btn.classList.add('active', 'bg-purple-100', 'text-purple-700');
+                    }
+                });
+            }
+        }
+
+        function updateTaskCount() {
+            const visibleMobileCards = document.querySelectorAll('#mobileTaskGrid .task-card:not(.hidden)').length;
+            const visibleDesktopCards = document.querySelectorAll('#desktopTaskGrid .task-card:not(.hidden)').length;
+            
+            // Update mobile header count
+            const mobileHeader = document.querySelector('.lg\\:hidden p');
+            if (mobileHeader) {
+                const totalVisible = Math.max(visibleMobileCards, visibleDesktopCards);
+                mobileHeader.textContent = `${totalVisible} tasks for ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+            }
+            
+            // Update desktop header count
+            const desktopHeader = document.querySelector('.hidden.lg\\:block h3');
+            if (desktopHeader) {
+                const totalVisible = Math.max(visibleMobileCards, visibleDesktopCards);
+                const originalText = desktopHeader.textContent.split(' - ')[0];
+                desktopHeader.textContent = `${originalText} - ${totalVisible} Tasks`;
+            }
+        }
+
+        function clearAllFilters() {
+            currentFilters = {
+                status: 'all',
+                user: 'all',
+                priority: 'all'
+            };
+            
+            // Reset select elements
+            const statusFilter = document.getElementById('statusFilter');
+            const userFilter = document.getElementById('userFilter');
+            const priorityFilter = document.getElementById('priorityFilter');
+            const searchInput = document.getElementById('taskSearch');
+            
+            if (statusFilter) statusFilter.value = 'all';
+            if (userFilter) userFilter.value = 'all';
+            if (priorityFilter) priorityFilter.value = 'all';
+            if (searchInput) searchInput.value = '';
+            
+            // Reset mobile filter buttons
+            const mobileButtons = document.querySelectorAll('.filter-btn');
+            mobileButtons.forEach(btn => {
+                btn.classList.remove('active', 'bg-purple-100', 'text-purple-700');
+                if (btn.onclick.toString().includes("'all'")) {
+                    btn.classList.add('active', 'bg-purple-100', 'text-purple-700');
+                }
+            });
+            
+            // Clear search and apply filters
+            searchTasks('');
+            applyFilters();
+        }
+
+        // Search functionality
+        function searchTasks(searchTerm) {
+            const mobileCards = document.querySelectorAll('#mobileTaskGrid .task-card');
+            const desktopCards = document.querySelectorAll('#desktopTaskGrid .task-card');
+            
+            [...mobileCards, ...desktopCards].forEach(card => {
+                const title = card.querySelector('h4').textContent.toLowerCase();
+                const details = card.querySelector('p')?.textContent.toLowerCase() || '';
+                const assignee = card.querySelector('.text-gray-500')?.textContent.toLowerCase() || '';
+                
+                const searchLower = searchTerm.toLowerCase();
+                const isVisible = !searchTerm || 
+                    title.includes(searchLower) || 
+                    details.includes(searchLower) || 
+                    assignee.includes(searchLower);
+                
+                if (isVisible) {
+                    card.style.display = 'block';
+                    card.classList.remove('search-hidden');
+                } else {
+                    card.style.display = 'none';
+                    card.classList.add('search-hidden');
+                }
+            });
+            
+            updateTaskCount();
+        }
+
+        // Add search input event listener
+        document.addEventListener('DOMContentLoaded', function() {
+            const searchInput = document.getElementById('taskSearch');
+            if (searchInput) {
+                searchInput.addEventListener('input', function(e) {
+                    searchTasks(e.target.value);
+                });
+            }
+        });
     </script>
 </body>
 </html>
