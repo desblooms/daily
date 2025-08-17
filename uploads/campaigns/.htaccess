@@ -1,0 +1,33 @@
+# Security rules for campaign uploads directory
+
+# Prevent execution of PHP files
+<Files "*.php">
+    Order Allow,Deny
+    Deny from all
+</Files>
+
+# Allow only specific file types
+<FilesMatch "\.(jpg|jpeg|png|gif|webp|mp4|mov|avi|webm)$">
+    Order Allow,Deny
+    Allow from all
+</FilesMatch>
+
+# Deny all other files
+<FilesMatch "^(?!.*\.(jpg|jpeg|png|gif|webp|mp4|mov|avi|webm)$).*$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
+
+# Set proper MIME types
+AddType image/jpeg .jpg .jpeg
+AddType image/png .png
+AddType image/gif .gif
+AddType image/webp .webp
+AddType video/mp4 .mp4
+AddType video/quicktime .mov
+AddType video/x-msvideo .avi
+AddType video/webm .webm
+
+# Security headers
+Header always set X-Content-Type-Options nosniff
+Header always set X-Frame-Options DENY

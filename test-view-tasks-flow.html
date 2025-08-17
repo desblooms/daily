@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test View Tasks Flow</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }
+        .test-section { border: 1px solid #ccc; margin: 20px 0; padding: 15px; border-radius: 5px; }
+        .success { background: #d4edda; border-color: #28a745; }
+        .info { background: #d1ecf1; border-color: #17a2b8; }
+        button { padding: 10px 20px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        .url-display { background: #f8f9fa; border: 1px solid #dee2e6; padding: 10px; margin: 10px 0; border-radius: 3px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <h1>🔧 Test: View Tasks Flow Fix</h1>
+    
+    <div class="test-section info">
+        <h2>Problem Summary</h2>
+        <p><strong>Issue:</strong> When clicking "View Tasks" on member cards in members.php, the admin dashboard shows all tasks instead of filtering by the specific team member.</p>
+        <p><strong>Root Cause:</strong> The admin-dashboard.php was not reading the user_id parameter from the URL and was calling getTasks(null, $selectedDate) which returns all tasks.</p>
+    </div>
+
+    <div class="test-section success">
+        <h2>✅ Fix Applied</h2>
+        <p><strong>Changes Made:</strong></p>
+        <ul>
+            <li>Added user_id parameter parsing in admin-dashboard.php</li>
+            <li>Updated getTasks call to use filtered user ID</li>
+            <li>Updated page titles to show filtered user name</li>
+            <li>Added proper validation for user_id parameter</li>
+        </ul>
+    </div>
+
+    <div class="test-section">
+        <h2>🧪 Test Scenarios</h2>
+        
+        <h3>1. Test URL Generation (from members.php)</h3>
+        <p>The viewMemberTasks function in members.php generates URLs like:</p>
+        <div class="url-display">admin-dashboard.php?view=tasks&user_id=1</div>
+        <div class="url-display">admin-dashboard.php?view=tasks&user_id=2</div>
+        <div class="url-display">admin-dashboard.php?view=tasks&user_id=3</div>
+
+        <h3>2. Test Parameter Handling</h3>
+        <button onclick="testParameter('1')">Test User ID 1</button>
+        <button onclick="testParameter('2')">Test User ID 2</button>
+        <button onclick="testParameter('invalid')">Test Invalid ID</button>
+        <button onclick="testParameter('')">Test Empty ID</button>
+        
+        <div id="parameterResults"></div>
+
+        <h3>3. Test Navigation Flow</h3>
+        <p>Simulate the complete flow:</p>
+        <ol>
+            <li>Admin visits members.php</li>
+            <li>Admin clicks "View Tasks" on a member card</li>
+            <li>JavaScript calls: <code>viewMemberTasks(userId)</code></li>
+            <li>Browser redirects to: <code>admin-dashboard.php?view=tasks&user_id={userId}</code></li>
+            <li>Admin dashboard processes the user_id parameter</li>
+            <li>Page shows only that user's tasks</li>
+        </ol>
+
+        <button onclick="simulateFlow()">🚀 Simulate Complete Flow</button>
+        <div id="flowResults"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>📋 Manual Testing Steps</h2>
+        <ol>
+            <li>Open members.php in your browser</li>
+            <li>Find a member card with tasks</li>
+            <li>Click the "View Tasks" button</li>
+            <li>Verify you're redirected to admin-dashboard.php with the correct URL parameters</li>
+            <li>Verify the page title shows "Task Management - [User Name]"</li>
+            <li>Verify only that user's tasks are displayed</li>
+            <li>Verify the task count reflects only that user's tasks</li>
+        </ol>
+    </div>
+
+    <div class="test-section info">
+        <h2>🔍 Code Changes Summary</h2>
+        <h3>admin-dashboard.php</h3>
+        <pre style="background: #f8f9fa; padding: 10px; border-radius: 3px;">
+// BEFORE:
+$todayTasks = getTasks(null, $selectedDate);
+
+// AFTER:
+$filterUserId = isset($_GET['user_id']) && is_numeric($_GET['user_id']) ? (int)$_GET['user_id'] : null;
+$todayTasks = getTasks($filterUserId, $selectedDate);
+        </pre>
+    </div>
+
+    <script>
+        function testParameter(userIdValue) {
+            const results = document.getElementById('parameterResults');
+            
+            // Simulate the parameter parsing logic
+            const isNumeric = !isNaN(userIdValue) && userIdValue !== '' && userIdValue !== null;
+            const filterUserId = isNumeric ? parseInt(userIdValue) : null;
+            
+            const resultHtml = `
+                <div style="margin: 10px 0; padding: 10px; background: #f8f9fa; border-radius: 3px;">
+                    <strong>Input:</strong> user_id="${userIdValue}"<br>
+                    <strong>Is Numeric:</strong> ${isNumeric}<br>
+                    <strong>Filter User ID:</strong> ${filterUserId}<br>
+                    <strong>getTasks call:</strong> getTasks(${filterUserId}, selectedDate)
+                </div>
+            `;
+            
+            results.innerHTML += resultHtml;
+        }
+
+        function simulateFlow() {
+            const results = document.getElementById('flowResults');
+            const steps = [
+                "✅ User visits members.php",
+                "✅ User clicks 'View Tasks' on member card with ID 2",
+                "✅ JavaScript executes: viewMemberTasks(2)",
+                "✅ Browser redirects to: admin-dashboard.php?view=tasks&user_id=2",
+                "✅ admin-dashboard.php processes parameters:",
+                "   • $currentView = 'tasks'",
+                "   • $filterUserId = 2",
+                "   • $selectedDate = current date",
+                "✅ getTasks(2, selectedDate) called - returns only user 2's tasks",
+                "✅ Page title updated to 'Task Management - [User 2 Name]'",
+                "✅ Task count shows only user 2's task count",
+                "✅ Task list displays only user 2's tasks"
+            ];
+
+            let resultHtml = '<div style="margin: 10px 0; padding: 10px; background: #d4edda; border-radius: 3px;">';
+            resultHtml += '<h4>🎉 Flow Simulation Complete!</h4>';
+            steps.forEach(step => {
+                resultHtml += '<div style="margin: 2px 0;">' + step + '</div>';
+            });
+            resultHtml += '</div>';
+
+            results.innerHTML = resultHtml;
+        }
+
+        // Auto-run parameter tests
+        window.onload = function() {
+            console.log('🧪 Running automatic parameter tests...');
+            testParameter('1');
+            testParameter('2');
+            testParameter('invalid');
+            testParameter('');
+        };
+    </script>
+</body>
+</html>

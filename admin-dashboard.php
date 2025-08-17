@@ -166,12 +166,41 @@ $recentActivities = getRecentActivities(20);
                     <span class="font-medium">Manage Members</span>
                 </a>
 
-                <a href="admin-password-management.php" class="nav-item flex items-center space-x-3 p-3 rounded-xl transition-all text-gray-600 hover:bg-gray-50">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
-                    </svg>
-                    <span class="font-medium">Security</span>
-                </a>
+                <!-- Campaign Management Section -->
+                <div class="border-t border-gray-200 pt-4 mt-4">
+                    <p class="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Lead Management</p>
+                    
+                    <a href="campaigns.php" class="nav-item flex items-center space-x-3 p-3 rounded-xl transition-all text-gray-600 hover:bg-gray-50">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"></path>
+                        </svg>
+                        <span class="font-medium">Campaigns</span>
+                    </a>
+
+                    <a href="lead-dashboard.php" class="nav-item flex items-center space-x-3 p-3 rounded-xl transition-all text-gray-600 hover:bg-gray-50">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                        </svg>
+                        <span class="font-medium">Lead Dashboard</span>
+                    </a>
+
+                    <a href="admin-lead-approval.php" class="nav-item flex items-center space-x-3 p-3 rounded-xl transition-all text-gray-600 hover:bg-gray-50">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <span class="font-medium">Lead Approvals</span>
+                    </a>
+                </div>
+
+                <div class="border-t border-gray-200 pt-4 mt-4">
+                    <a href="admin-password-management.php" class="nav-item flex items-center space-x-3 p-3 rounded-xl transition-all text-gray-600 hover:bg-gray-50">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                        </svg>
+                        <span class="font-medium">Security</span>
+                    </a>
+                </div>
 
                 <div class="border-t border-gray-200 pt-4 mt-4">
                     <a href="change-password.php" class="nav-item flex items-center space-x-3 p-3 rounded-xl transition-all text-gray-600 hover:bg-gray-50">
