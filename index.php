@@ -8,24 +8,96 @@ requireLogin();
 $currentPage = $_GET['page'] ?? 'today';
 $selectedDate = $_GET['date'] ?? date('Y-m-d');
 
-// Get user's tasks based on current page
+// If we have a date parameter, switch to day view to show specific date
+if (isset($_GET['date']) && $_GET['date'] !== date('Y-m-d')) {
+    $currentPage = 'day';
+}
+
+// Get user's tasks based on current page with DIRECT SQL to ensure proper date filtering
 switch ($currentPage) {
     case 'today':
-        $tasks = getTasks($_SESSION['user_id'], date('Y-m-d'));
+        $todayDate = date('Y-m-d');
+        $stmt = $pdo->prepare("
+            SELECT t.*, u.name as assigned_name, u.email as assigned_email 
+            FROM tasks t 
+            LEFT JOIN users u ON t.assigned_to = u.id 
+            WHERE t.assigned_to = ? AND t.date = ? 
+            ORDER BY t.priority = 'high' DESC, t.priority = 'medium' DESC, t.created_at DESC
+        ");
+        $stmt->execute([$_SESSION['user_id'], $todayDate]);
+        $tasks = $stmt->fetchAll();
         $pageTitle = "Today's Tasks";
+        $selectedDate = $todayDate; // Ensure selectedDate is set to today
         break;
+        
+    case 'day':
+        // Show tasks for a specific selected date
+        $stmt = $pdo->prepare("
+            SELECT t.*, u.name as assigned_name, u.email as assigned_email 
+            FROM tasks t 
+            LEFT JOIN users u ON t.assigned_to = u.id 
+            WHERE t.assigned_to = ? AND t.date = ? 
+            ORDER BY t.priority = 'high' DESC, t.priority = 'medium' DESC, t.created_at DESC
+        ");
+        $stmt->execute([$_SESSION['user_id'], $selectedDate]);
+        $tasks = $stmt->fetchAll();
+        
+        // Create friendly page title
+        $dateObj = DateTime::createFromFormat('Y-m-d', $selectedDate);
+        $today = new DateTime();
+        $yesterday = new DateTime('yesterday');
+        $tomorrow = new DateTime('tomorrow');
+        
+        if ($selectedDate === $today->format('Y-m-d')) {
+            $pageTitle = "Today's Tasks";
+        } elseif ($selectedDate === $yesterday->format('Y-m-d')) {
+            $pageTitle = "Yesterday's Tasks";
+        } elseif ($selectedDate === $tomorrow->format('Y-m-d')) {
+            $pageTitle = "Tomorrow's Tasks";
+        } else {
+            $pageTitle = "Tasks for " . $dateObj->format('M j, Y');
+        }
+        break;
+        
     case 'week':
         $tasks = getWeekTasks($_SESSION['user_id']);
         $pageTitle = "This Week";
         break;
+        
     case 'all':
-        $tasks = getTasks($_SESSION['user_id']);
+        $stmt = $pdo->prepare("
+            SELECT t.*, u.name as assigned_name, u.email as assigned_email 
+            FROM tasks t 
+            LEFT JOIN users u ON t.assigned_to = u.id 
+            WHERE t.assigned_to = ? 
+            ORDER BY t.date DESC, t.priority = 'high' DESC, t.created_at DESC 
+            LIMIT 100
+        ");
+        $stmt->execute([$_SESSION['user_id']]);
+        $tasks = $stmt->fetchAll();
         $pageTitle = "All Tasks";
         break;
+        
     default:
-        $tasks = getTasks($_SESSION['user_id'], $selectedDate);
+        // Ensure we have a valid date format
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $selectedDate)) {
+            $selectedDate = date('Y-m-d');
+        }
+        
+        $stmt = $pdo->prepare("
+            SELECT t.*, u.name as assigned_name, u.email as assigned_email 
+            FROM tasks t 
+            LEFT JOIN users u ON t.assigned_to = u.id 
+            WHERE t.assigned_to = ? AND t.date = ? 
+            ORDER BY t.priority = 'high' DESC, t.priority = 'medium' DESC, t.created_at DESC
+        ");
+        $stmt->execute([$_SESSION['user_id'], $selectedDate]);
+        $tasks = $stmt->fetchAll();
         $pageTitle = "Tasks for " . date('M j', strtotime($selectedDate));
 }
+
+// Debug: Log what we're showing (remove in production)
+error_log("Index.php Debug: User {$_SESSION['user_id']}, Page: {$currentPage}, Date: {$selectedDate}, Tasks found: " . count($tasks));
 
 // Get user stats
 $userStats = getUserStats($_SESSION['user_id']);
@@ -325,7 +397,7 @@ $notifications = getUserNotifications($_SESSION['user_id'], true, 5);
     <!-- Bottom Navigation -->
     <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-2 glass-effect">
         <div class="flex justify-around">
-            <a href="?page=today" class="flex flex-col items-center space-y-1 p-2 <?= $currentPage === 'today' ? 'text-blue-600' : 'text-gray-400' ?> transition-colors">
+            <a href="?page=today" class="flex flex-col items-center space-y-1 p-2 <?= ($currentPage === 'today' || $currentPage === 'day') ? 'text-blue-600' : 'text-gray-400' ?> transition-colors">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3a2 2 0 012-2h4a2 2 0 012 2v4m-6 4l2 2 4-4"></path>
                 </svg>
@@ -419,11 +491,25 @@ $notifications = getUserNotifications($_SESSION['user_id'], true, 5);
         function changeDate(days) {
             currentDate.setDate(currentDate.getDate() + days);
             const dateString = currentDate.toISOString().split('T')[0];
-            window.location.href = `?page=<?= $currentPage ?>&date=${dateString}`;
+            const today = new Date().toISOString().split('T')[0];
+            
+            // If navigating to today, use 'today' page, otherwise use 'day' page
+            if (dateString === today) {
+                window.location.href = `?page=today`;
+            } else {
+                window.location.href = `?page=day&date=${dateString}`;
+            }
         }
 
         function jumpToDate(date) {
-            window.location.href = `?page=<?= $currentPage ?>&date=${date}`;
+            const today = new Date().toISOString().split('T')[0];
+            
+            // If jumping to today, use 'today' page, otherwise use 'day' page
+            if (date === today) {
+                window.location.href = `?page=today`;
+            } else {
+                window.location.href = `?page=day&date=${date}`;
+            }
         }
 
         function showOtherDays() {
