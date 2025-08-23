@@ -24,6 +24,7 @@ CREATE INDEX IF NOT EXISTS idx_task_attachments_uploaded_by ON task_attachments(
 CREATE INDEX IF NOT EXISTS idx_task_attachments_type ON task_attachments(attachment_type);
 CREATE INDEX IF NOT EXISTS idx_task_attachments_created ON task_attachments(created_at);
 
+
 -- Indexes for task_work_outputs table (if exists)
 CREATE INDEX IF NOT EXISTS idx_task_work_outputs_task_id ON task_work_outputs(task_id);
 CREATE INDEX IF NOT EXISTS idx_task_work_outputs_created_by ON task_work_outputs(created_by);
