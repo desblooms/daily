@@ -82,6 +82,26 @@ try {
             exportTasks($pdo, $input);
             break;
             
+        case 'add_work_output':
+            addWorkOutput($pdo, $input);
+            break;
+            
+        case 'get_work_outputs':
+            getWorkOutputs($pdo, $input);
+            break;
+            
+        case 'add_specification':
+            addTaskSpecification($pdo, $input);
+            break;
+            
+        case 'update_progress':
+            updateTaskProgress($pdo, $input);
+            break;
+            
+        case 'get_enhanced_details':
+            getEnhancedTaskDetails($pdo, $input);
+            break;
+            
         default:
             echo json_encode([
                 'success' => false, 
@@ -206,9 +226,15 @@ function createNewTask($pdo, $input) {
         $pdo->beginTransaction();
         
         $sql = "
-            INSERT INTO tasks (title, details, assigned_to, date, created_by, updated_by, priority, estimated_hours, due_time, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending')
+            INSERT INTO tasks (title, details, assigned_to, date, created_by, updated_by, priority, estimated_hours, due_time, status, task_category, requirements, deliverables, external_links)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', ?, ?, ?, ?)
         ";
+        
+        // Process external links
+        $externalLinks = null;
+        if (!empty($input['external_links']) && is_array($input['external_links'])) {
+            $externalLinks = json_encode($input['external_links']);
+        }
         
         $stmt = $pdo->prepare($sql);
         $result = $stmt->execute([
@@ -220,8 +246,39 @@ function createNewTask($pdo, $input) {
             $_SESSION['user_id'],
             $input['priority'] ?? 'medium',
             !empty($input['estimated_hours']) ? (float)$input['estimated_hours'] : null,
-            $input['due_time'] ?? null
+            $input['due_time'] ?? null,
+            $input['task_category'] ?? null,
+            trim($input['requirements'] ?? ''),
+            trim($input['deliverables'] ?? ''),
+            $externalLinks
         ]);
+        
+        if (!$result) {
+            throw new Exception('Failed to insert task');
+        }
+        
+        $taskId = $pdo->lastInsertId();
+        
+        // Add specifications if provided
+        if (!empty($input['specifications']) && is_array($input['specifications'])) {
+            $specStmt = $pdo->prepare("
+                INSERT INTO task_specifications (task_id, spec_type, title, description, priority, created_by)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ");
+            
+            foreach ($input['specifications'] as $spec) {
+                if (!empty($spec['title']) && !empty($spec['type'])) {
+                    $specStmt->execute([
+                        $taskId,
+                        $spec['type'],
+                        trim($spec['title']),
+                        trim($spec['description'] ?? ''),
+                        $spec['priority'] ?? 'medium',
+                        $_SESSION['user_id']
+                    ]);
+                }
+            }
+        }
         
         if (!$result) {
             throw new Exception('Failed to insert task');
@@ -718,6 +775,366 @@ function exportTasks($pdo, $input) {
         
     } catch (Exception $e) {
         echo json_encode(['success' => false, 'message' => 'Failed to export tasks: ' . $e->getMessage()]);
+    }
+}
+
+function addWorkOutput($pdo, $input) {
+    $taskId = $input['task_id'] ?? null;
+    $outputType = $input['output_type'] ?? null;
+    $title = $input['title'] ?? null;
+    
+    if (!$taskId || !$outputType || !$title) {
+        echo json_encode(['success' => false, 'message' => 'Missing required fields']);
+        return;
+    }
+    
+    // Validate task exists and user has permission
+    $stmt = $pdo->prepare("SELECT * FROM tasks WHERE id = ?");
+    $stmt->execute([$taskId]);
+    $task = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$task) {
+        echo json_encode(['success' => false, 'message' => 'Task not found']);
+        return;
+    }
+    
+    // Check permissions
+    if ($_SESSION['role'] !== 'admin' && 
+        $task['assigned_to'] != $_SESSION['user_id'] && 
+        $task['created_by'] != $_SESSION['user_id']) {
+        echo json_encode(['success' => false, 'message' => 'Permission denied']);
+        return;
+    }
+    
+    try {
+        $pdo->beginTransaction();
+        
+        $stmt = $pdo->prepare("
+            INSERT INTO task_work_outputs (task_id, output_type, title, description, file_path, external_url, thumbnail_url, visibility, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+        
+        $result = $stmt->execute([
+            $taskId,
+            $outputType,
+            trim($title),
+            trim($input['description'] ?? ''),
+            $input['file_path'] ?? null,
+            $input['external_url'] ?? null,
+            $input['thumbnail_url'] ?? null,
+            $input['visibility'] ?? 'team',
+            $_SESSION['user_id']
+        ]);
+        
+        if (!$result) {
+            throw new Exception('Failed to add work output');
+        }
+        
+        $outputId = $pdo->lastInsertId();
+        
+        // Log activity
+        $stmt = $pdo->prepare("
+            INSERT INTO activity_logs (user_id, action, resource_type, resource_id, details)
+            VALUES (?, 'work_output_added', 'task', ?, ?)
+        ");
+        $stmt->execute([
+            $_SESSION['user_id'],
+            $taskId,
+            json_encode(['output_type' => $outputType, 'title' => $title, 'output_id' => $outputId])
+        ]);
+        
+        $pdo->commit();
+        
+        echo json_encode([
+            'success' => true, 
+            'message' => 'Work output added successfully',
+            'output_id' => $outputId
+        ]);
+        
+    } catch (Exception $e) {
+        $pdo->rollback();
+        echo json_encode(['success' => false, 'message' => 'Failed to add work output: ' . $e->getMessage()]);
+    }
+}
+
+function getWorkOutputs($pdo, $input) {
+    $taskId = $input['task_id'] ?? null;
+    
+    if (!$taskId) {
+        echo json_encode(['success' => false, 'message' => 'Missing task ID']);
+        return;
+    }
+    
+    // Validate task exists and user has permission
+    $stmt = $pdo->prepare("SELECT * FROM tasks WHERE id = ?");
+    $stmt->execute([$taskId]);
+    $task = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$task) {
+        echo json_encode(['success' => false, 'message' => 'Task not found']);
+        return;
+    }
+    
+    // Check permissions
+    if ($_SESSION['role'] !== 'admin' && 
+        $task['assigned_to'] != $_SESSION['user_id'] && 
+        $task['created_by'] != $_SESSION['user_id']) {
+        echo json_encode(['success' => false, 'message' => 'Permission denied']);
+        return;
+    }
+    
+    try {
+        $stmt = $pdo->prepare("
+            SELECT twa.*, u.name as created_by_name, u.avatar as created_by_avatar
+            FROM task_work_outputs twa
+            LEFT JOIN users u ON twa.created_by = u.id
+            WHERE twa.task_id = ?
+            ORDER BY twa.created_at DESC
+        ");
+        $stmt->execute([$taskId]);
+        $outputs = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        echo json_encode([
+            'success' => true,
+            'outputs' => $outputs,
+            'count' => count($outputs)
+        ]);
+        
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'message' => 'Failed to fetch work outputs: ' . $e->getMessage()]);
+    }
+}
+
+function addTaskSpecification($pdo, $input) {
+    $taskId = $input['task_id'] ?? null;
+    $specType = $input['spec_type'] ?? null;
+    $title = $input['title'] ?? null;
+    $description = $input['description'] ?? null;
+    
+    if (!$taskId || !$specType || !$title || !$description) {
+        echo json_encode(['success' => false, 'message' => 'Missing required fields']);
+        return;
+    }
+    
+    // Validate task exists and user has permission (admin only)
+    if ($_SESSION['role'] !== 'admin') {
+        echo json_encode(['success' => false, 'message' => 'Only administrators can add task specifications']);
+        return;
+    }
+    
+    $stmt = $pdo->prepare("SELECT id FROM tasks WHERE id = ?");
+    $stmt->execute([$taskId]);
+    if (!$stmt->fetch()) {
+        echo json_encode(['success' => false, 'message' => 'Task not found']);
+        return;
+    }
+    
+    try {
+        $stmt = $pdo->prepare("
+            INSERT INTO task_specifications (task_id, spec_type, title, description, priority, created_by)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ");
+        
+        $result = $stmt->execute([
+            $taskId,
+            $specType,
+            trim($title),
+            trim($description),
+            $input['priority'] ?? 'medium',
+            $_SESSION['user_id']
+        ]);
+        
+        if (!$result) {
+            throw new Exception('Failed to add specification');
+        }
+        
+        echo json_encode([
+            'success' => true, 
+            'message' => 'Task specification added successfully',
+            'spec_id' => $pdo->lastInsertId()
+        ]);
+        
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'message' => 'Failed to add specification: ' . $e->getMessage()]);
+    }
+}
+
+function updateTaskProgress($pdo, $input) {
+    $taskId = $input['task_id'] ?? null;
+    $description = $input['description'] ?? null;
+    
+    if (!$taskId || !$description) {
+        echo json_encode(['success' => false, 'message' => 'Missing required fields']);
+        return;
+    }
+    
+    // Validate task exists and user has permission
+    $stmt = $pdo->prepare("SELECT * FROM tasks WHERE id = ?");
+    $stmt->execute([$taskId]);
+    $task = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$task) {
+        echo json_encode(['success' => false, 'message' => 'Task not found']);
+        return;
+    }
+    
+    // Check permissions - assigned user or admin
+    if ($_SESSION['role'] !== 'admin' && $task['assigned_to'] != $_SESSION['user_id']) {
+        echo json_encode(['success' => false, 'message' => 'Permission denied']);
+        return;
+    }
+    
+    try {
+        $pdo->beginTransaction();
+        
+        $stmt = $pdo->prepare("
+            INSERT INTO task_progress_updates (task_id, user_id, progress_percentage, update_type, title, description, hours_logged, is_milestone, visibility)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+        
+        $result = $stmt->execute([
+            $taskId,
+            $_SESSION['user_id'],
+            $input['progress_percentage'] ?? null,
+            $input['update_type'] ?? 'progress',
+            trim($input['title'] ?? ''),
+            trim($description),
+            !empty($input['hours_logged']) ? (float)$input['hours_logged'] : null,
+            !empty($input['is_milestone']) ? 1 : 0,
+            $input['visibility'] ?? 'team'
+        ]);
+        
+        if (!$result) {
+            throw new Exception('Failed to add progress update');
+        }
+        
+        // Log activity
+        $stmt = $pdo->prepare("
+            INSERT INTO activity_logs (user_id, action, resource_type, resource_id, details)
+            VALUES (?, 'progress_updated', 'task', ?, ?)
+        ");
+        $stmt->execute([
+            $_SESSION['user_id'],
+            $taskId,
+            json_encode(['progress_percentage' => $input['progress_percentage'] ?? 0])
+        ]);
+        
+        $pdo->commit();
+        
+        echo json_encode([
+            'success' => true, 
+            'message' => 'Progress updated successfully',
+            'update_id' => $pdo->lastInsertId()
+        ]);
+        
+    } catch (Exception $e) {
+        $pdo->rollback();
+        echo json_encode(['success' => false, 'message' => 'Failed to update progress: ' . $e->getMessage()]);
+    }
+}
+
+function getEnhancedTaskDetails($pdo, $input) {
+    $taskId = $input['task_id'] ?? null;
+    
+    if (!$taskId) {
+        echo json_encode(['success' => false, 'message' => 'Missing task ID']);
+        return;
+    }
+    
+    try {
+        // Get task with enhanced details
+        $stmt = $pdo->prepare("
+            SELECT t.*, 
+                   u.name as assigned_to_name,
+                   u.email as assigned_to_email,
+                   u.avatar as assigned_to_avatar,
+                   c.name as created_by_name
+            FROM tasks t
+            LEFT JOIN users u ON t.assigned_to = u.id
+            LEFT JOIN users c ON t.created_by = c.id
+            WHERE t.id = ?
+        ");
+        $stmt->execute([$taskId]);
+        $task = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$task) {
+            echo json_encode(['success' => false, 'message' => 'Task not found']);
+            return;
+        }
+        
+        // Check permissions
+        if ($_SESSION['role'] !== 'admin' && 
+            $task['assigned_to'] != $_SESSION['user_id'] && 
+            $task['created_by'] != $_SESSION['user_id']) {
+            echo json_encode(['success' => false, 'message' => 'Permission denied']);
+            return;
+        }
+        
+        // Get task specifications
+        $stmt = $pdo->prepare("
+            SELECT * FROM task_specifications 
+            WHERE task_id = ? 
+            ORDER BY spec_type, order_index, id
+        ");
+        $stmt->execute([$taskId]);
+        $specifications = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Get work outputs
+        $stmt = $pdo->prepare("
+            SELECT twa.*, u.name as created_by_name
+            FROM task_work_outputs twa
+            LEFT JOIN users u ON twa.created_by = u.id
+            WHERE twa.task_id = ?
+            ORDER BY twa.created_at DESC
+        ");
+        $stmt->execute([$taskId]);
+        $workOutputs = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Get progress updates
+        $stmt = $pdo->prepare("
+            SELECT tpu.*, u.name as user_name, u.avatar as user_avatar
+            FROM task_progress_updates tpu
+            LEFT JOIN users u ON tpu.user_id = u.id
+            WHERE tpu.task_id = ?
+            ORDER BY tpu.created_at DESC
+        ");
+        $stmt->execute([$taskId]);
+        $progressUpdates = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Get attachments
+        $stmt = $pdo->prepare("
+            SELECT ta.*, u.name as uploaded_by_name
+            FROM task_attachments ta
+            LEFT JOIN users u ON ta.uploaded_by = u.id
+            WHERE ta.task_id = ?
+            ORDER BY ta.created_at DESC
+        ");
+        $stmt->execute([$taskId]);
+        $attachments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Get collaborators
+        $stmt = $pdo->prepare("
+            SELECT tc.*, u.name as user_name, u.email as user_email, u.avatar as user_avatar
+            FROM task_collaboration tc
+            LEFT JOIN users u ON tc.user_id = u.id
+            WHERE tc.task_id = ? AND tc.status = 'accepted'
+            ORDER BY tc.role
+        ");
+        $stmt->execute([$taskId]);
+        $collaborators = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        echo json_encode([
+            'success' => true,
+            'task' => $task,
+            'specifications' => $specifications,
+            'work_outputs' => $workOutputs,
+            'progress_updates' => $progressUpdates,
+            'attachments' => $attachments,
+            'collaborators' => $collaborators
+        ]);
+        
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'message' => 'Failed to fetch enhanced task details: ' . $e->getMessage()]);
     }
 }
 ?>
