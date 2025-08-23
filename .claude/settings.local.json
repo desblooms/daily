@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(del /Q test-*.php test-*.html debug-*.php check-*.php create-sample-users.php create-test-tasks.php setup-test-session.php cleanup-test-files.php diagnose-task-issues.php fix-*.php apply-date-fix.php verify-date-filtering.html enhanced-task-form.html)",
+      "Bash(php:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
