@@ -1,10 +1,18 @@
 <?php
-// Users API - Clean version
+// Users API - Clean version with enhanced error handling
+error_reporting(E_ALL);
+ini_set('display_errors', 0); // Don't display errors in production, but log them
+
 header('Content-Type: application/json');
 header('Cache-Control: no-cache, must-revalidate');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization');
+
+// Handle OPTIONS request for CORS
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    exit(0);
+}
 
 try {
     // Start session if not already started
@@ -98,13 +106,35 @@ try {
             ]]);
     }
     
-} catch (Exception $e) {
+} catch (Throwable $e) {
     http_response_code(500);
-    error_log("Users API Error: " . $e->getMessage());
+    
+    // Log detailed error information
+    $errorDetails = [
+        'message' => $e->getMessage(),
+        'file' => $e->getFile(),
+        'line' => $e->getLine(),
+        'trace' => $e->getTraceAsString(),
+        'request_uri' => $_SERVER['REQUEST_URI'] ?? 'unknown',
+        'request_method' => $_SERVER['REQUEST_METHOD'] ?? 'unknown',
+        'post_data' => $_POST,
+        'get_data' => $_GET,
+        'session_data' => [
+            'user_id' => $_SESSION['user_id'] ?? 'not set',
+            'role' => $_SESSION['role'] ?? 'not set'
+        ]
+    ];
+    
+    error_log("Users API Error: " . json_encode($errorDetails));
+    
     echo json_encode([
         'success' => false, 
         'message' => 'Internal server error',
-        'debug' => $e->getMessage()
+        'error_details' => [
+            'message' => $e->getMessage(),
+            'file' => basename($e->getFile()),
+            'line' => $e->getLine()
+        ]
     ]);
 }
 
@@ -253,7 +283,7 @@ function updateUserProfile($pdo) {
         
         $stmt = $pdo->prepare("
             UPDATE users 
-            SET " . implode(', ', $updates) . ", updated_at = NOW()
+            SET " . implode(', ', $updates) . "
             WHERE id = ? AND is_active = TRUE
         ");
         $stmt->execute($params);
@@ -397,8 +427,8 @@ function createUser($pdo, $input) {
         $hashedPassword = password_hash($input['password'], PASSWORD_DEFAULT);
         
         $stmt = $pdo->prepare("
-            INSERT INTO users (name, email, password, role, department, phone, is_active)
-            VALUES (?, ?, ?, ?, ?, ?, TRUE)
+            INSERT INTO users (name, email, password, role, department, phone, is_active, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, TRUE, NOW())
         ");
         
         $result = $stmt->execute([
@@ -490,7 +520,7 @@ function deleteUser($pdo, $input) {
         $pdo->beginTransaction();
         
         // Soft delete - mark as inactive instead of actual deletion
-        $stmt = $pdo->prepare("UPDATE users SET is_active = FALSE, updated_at = NOW() WHERE id = ?");
+        $stmt = $pdo->prepare("UPDATE users SET is_active = FALSE WHERE id = ?");
         $stmt->execute([$userId]);
         
         // Log activity (with error handling)
@@ -551,7 +581,7 @@ function toggleUserStatus($pdo, $input) {
         
         $newStatus = !$user['is_active'];
         
-        $stmt = $pdo->prepare("UPDATE users SET is_active = ?, updated_at = NOW() WHERE id = ?");
+        $stmt = $pdo->prepare("UPDATE users SET is_active = ? WHERE id = ?");
         $stmt->execute([$newStatus, $userId]);
         
         // Log activity (with error handling)
@@ -610,7 +640,7 @@ function resetUserPassword($pdo, $input) {
         
         $hashedPassword = password_hash($newPassword, PASSWORD_DEFAULT);
         
-        $stmt = $pdo->prepare("UPDATE users SET password = ?, force_password_change = TRUE, updated_at = NOW() WHERE id = ?");
+        $stmt = $pdo->prepare("UPDATE users SET password = ?, force_password_change = TRUE WHERE id = ?");
         $stmt->execute([$hashedPassword, $userId]);
         
         // Log activity (with error handling)

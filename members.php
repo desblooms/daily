@@ -616,7 +616,7 @@ $users = $stmt->fetchAll();
             
             console.log('Sending data:', data); // Debug log
             
-            fetch('./api/users.php', {
+            fetch('./api/users-fixed.php', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -680,7 +680,7 @@ $users = $stmt->fetchAll();
         function deleteMember() {
             if (!currentDeleteUserId) return;
             
-            fetch('./api/users.php', {
+            fetch('./api/users-fixed.php', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -720,7 +720,7 @@ $users = $stmt->fetchAll();
 
         // View member details
         function viewMemberDetails(userId) {
-            fetch(`./api/users.php?action=get_user_profile&user_id=${userId}`)
+            fetch(`./api/users-fixed.php?action=get_user_profile&user_id=${userId}`)
                 .then(response => {
                     if (!response.ok) {
                         throw new Error(`HTTP ${response.status}: ${response.statusText}`);

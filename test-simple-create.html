@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Simple Create User API</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .result { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+        button { padding: 10px 20px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 5px; }
+        input { padding: 5px; margin: 5px; width: 200px; }
+    </style>
+</head>
+<body>
+    <h1>Test Simple Create User API</h1>
+    
+    <div>
+        <h3>Test User Data</h3>
+        <input type="text" id="name" placeholder="Name" value="Test User">
+        <input type="email" id="email" placeholder="Email" value="">
+        <input type="password" id="password" placeholder="Password" value="testpass123">
+        <select id="role">
+            <option value="user">User</option>
+            <option value="admin">Admin</option>
+        </select>
+    </div>
+    
+    <button onclick="testDebugAPI()">1. Test Debug API</button>
+    <button onclick="testCreateUser()">2. Test Create User</button>
+    <button onclick="testOriginalAPI()">3. Test Original API</button>
+    <button onclick="clearResults()">Clear</button>
+    
+    <div id="results"></div>
+
+    <script>
+        function log(message, type = 'info') {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = `result ${type}`;
+            div.innerHTML = message;
+            results.appendChild(div);
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+        
+        // Auto-generate unique email
+        document.getElementById('email').value = 'test' + Date.now() + '@example.com';
+
+        async function testDebugAPI() {
+            log('Testing Debug Step-by-Step API...', 'info');
+            
+            try {
+                const response = await fetch('./api/debug-step-by-step.php');
+                const text = await response.text();
+                
+                log(`Status: ${response.status}`, response.ok ? 'success' : 'error');
+                log(`Response: <pre>${text}</pre>`, 'info');
+                
+            } catch (error) {
+                log(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testCreateUser() {
+            log('Testing Simple Create User API...', 'info');
+            
+            const userData = {
+                name: document.getElementById('name').value,
+                email: document.getElementById('email').value,
+                password: document.getElementById('password').value,
+                role: document.getElementById('role').value
+            };
+            
+            log(`Sending: <pre>${JSON.stringify(userData, null, 2)}</pre>`, 'info');
+            
+            try {
+                const response = await fetch('./api/create-user-simple.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(userData)
+                });
+                
+                const text = await response.text();
+                
+                log(`Status: ${response.status}`, response.ok ? 'success' : 'error');
+                log(`Response: <pre>${text}</pre>`, response.ok ? 'success' : 'error');
+                
+                // Generate new email for next test
+                document.getElementById('email').value = 'test' + Date.now() + '@example.com';
+                
+            } catch (error) {
+                log(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testOriginalAPI() {
+            log('Testing Original Users API...', 'info');
+            
+            const userData = {
+                action: 'create_user',
+                name: document.getElementById('name').value,
+                email: document.getElementById('email').value,
+                password: document.getElementById('password').value,
+                role: document.getElementById('role').value
+            };
+            
+            log(`Sending: <pre>${JSON.stringify(userData, null, 2)}</pre>`, 'info');
+            
+            try {
+                const response = await fetch('./api/users.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(userData)
+                });
+                
+                const text = await response.text();
+                
+                log(`Status: ${response.status}`, response.ok ? 'success' : 'error');
+                log(`Response: <pre>${text}</pre>`, response.ok ? 'success' : 'error');
+                
+                // Generate new email for next test
+                document.getElementById('email').value = 'test' + Date.now() + '@example.com';
+                
+            } catch (error) {
+                log(`Error: ${error.message}`, 'error');
+            }
+        }
+    </script>
+</body>
+</html>
