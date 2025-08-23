@@ -112,8 +112,8 @@ function createTask($data) {
         
         $taskId = $pdo->lastInsertId();
         
-        // Initial status logging is handled by database trigger (new_task_trigger)
-        // which includes proper updated_by field automatically
+        // Log initial status
+        logTaskStatusChange($taskId, 'Pending', null, $data['created_by']);
         
         // Create notification for assigned user
         if ($data['assigned_to'] != $data['created_by']) {
@@ -157,8 +157,8 @@ function updateTaskStatus($taskId, $status, $userId, $comments = null) {
         $stmt = $pdo->prepare("UPDATE tasks SET {$setClause} WHERE id = ?");
         $stmt->execute(array_merge(array_values($updateData), [$taskId]));
         
-        // Status change logging is handled by database trigger (task_status_change_trigger)
-        // which includes previous_status field automatically
+        // Log status change
+        logTaskStatusChange($taskId, $status, $previousStatus, $userId, $comments);
         
         // Create notifications
         if ($userId != $task['assigned_to']) {

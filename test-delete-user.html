@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Delete User Functionality</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .result { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+        button { padding: 10px 20px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        .danger { background: #dc3545; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 5px; overflow-x: auto; }
+        input { padding: 5px; margin: 5px; width: 100px; }
+        select { padding: 5px; margin: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Test Delete User Functionality</h1>
+    
+    <div>
+        <h3>Test Parameters</h3>
+        <input type="number" id="userId" placeholder="User ID" value="">
+        <select id="deleteType">
+            <option value="soft">Soft Delete (Deactivate)</option>
+            <option value="hard">Hard Delete (Permanent)</option>
+        </select>
+        <button onclick="testDeleteUser()">Delete User</button>
+        <button onclick="checkUserExists()">Check if User Exists</button>
+        <button onclick="clearResults()">Clear</button>
+    </div>
+    
+    <div id="results"></div>
+
+    <script>
+        function log(message, type = 'info') {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = `result ${type}`;
+            div.innerHTML = message;
+            results.appendChild(div);
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+
+        async function testDeleteUser() {
+            const userId = document.getElementById('userId').value;
+            const deleteType = document.getElementById('deleteType').value;
+            
+            if (!userId) {
+                log('Please enter a User ID', 'error');
+                return;
+            }
+            
+            log(`Testing ${deleteType} delete for User ID: ${userId}`, 'info');
+            
+            try {
+                const response = await fetch('./api/users-fixed.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        action: 'delete_user',
+                        user_id: parseInt(userId),
+                        delete_type: deleteType
+                    })
+                });
+                
+                const text = await response.text();
+                
+                log(`Status: ${response.status}`, response.ok ? 'success' : 'error');
+                log(`Response: <pre>${text}</pre>`, response.ok ? 'success' : 'error');
+                
+                if (response.ok) {
+                    try {
+                        const data = JSON.parse(text);
+                        if (data.success) {
+                            log(`✅ Delete successful: ${data.message}`, 'success');
+                            if (data.user_info) {
+                                log(`Deleted user: ${data.user_info.name} (${data.user_info.email})`, 'info');
+                            }
+                        } else {
+                            log(`❌ Delete failed: ${data.message}`, 'error');
+                        }
+                    } catch (e) {
+                        log('JSON parsing error', 'error');
+                    }
+                }
+                
+            } catch (error) {
+                log(`Network Error: ${error.message}`, 'error');
+            }
+        }
+        
+        async function checkUserExists() {
+            const userId = document.getElementById('userId').value;
+            
+            if (!userId) {
+                log('Please enter a User ID', 'error');
+                return;
+            }
+            
+            log(`Checking if User ID ${userId} exists...`, 'info');
+            
+            try {
+                const response = await fetch(`./api/users-fixed.php?action=get_user_profile&user_id=${userId}`);
+                const text = await response.text();
+                
+                log(`Status: ${response.status}`, response.ok ? 'success' : 'error');
+                
+                if (response.ok) {
+                    try {
+                        const data = JSON.parse(text);
+                        if (data.success && data.user) {
+                            log(`✅ User exists: ${data.user.name} (${data.user.email}) - Active: ${data.user.is_active || 'unknown'}`, 'success');
+                        } else {
+                            log(`❌ User not found or inactive`, 'error');
+                        }
+                    } catch (e) {
+                        log('JSON parsing error', 'error');
+                    }
+                } else {
+                    log(`User check failed with status ${response.status}`, 'error');
+                }
+                
+            } catch (error) {
+                log(`Network Error: ${error.message}`, 'error');
+            }
+        }
+    </script>
+</body>
+</html>

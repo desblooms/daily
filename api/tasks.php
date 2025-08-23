@@ -1,7 +1,7 @@
 <?php
-// api/tasks.php - Production version  
-ini_set('display_errors', 0);
-error_reporting(0);
+// api/tasks.php - Clean version  
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
 ini_set('log_errors', 1);
 
 try {
@@ -43,8 +43,8 @@ try {
     // Get action from input data or fallback to GET/POST
     $action = $input['action'] ?? $_GET['action'] ?? $_POST['action'] ?? '';
     
-    // Production logging (only errors)
-    error_log("Tasks API called: Action={$action}, User={$_SESSION['user_id']}");
+    // Debug logging (remove in production)
+    error_log("Tasks API called: Action={$action}, User={$_SESSION['user_id']}, Role={$_SESSION['role']}, Input=" . json_encode($input));
     
     switch ($action) {
         case 'get_tasks':

@@ -15,6 +15,63 @@ $todayTasks = getTasks($filterUserId, $selectedDate);
 $users = getAllUsers();
 $recentActivities = getRecentActivities(20);
 
+// Enhanced functions for better data
+function getEnhancedAnalytics($date = null, $userId = null) {
+    global $pdo;
+    
+    $dateCondition = $date ? "AND t.date = ?" : "";
+    $userCondition = $userId ? "AND t.assigned_to = ?" : "";
+    $params = array_filter([$date, $userId]);
+    
+    // Task statistics
+    $taskStats = $pdo->prepare("
+        SELECT 
+            COUNT(*) as total_tasks,
+            COUNT(CASE WHEN t.status = 'Pending' THEN 1 END) as pending_tasks,
+            COUNT(CASE WHEN t.status = 'On Progress' THEN 1 END) as active_tasks,
+            COUNT(CASE WHEN t.status = 'Done' THEN 1 END) as completed_tasks,
+            COUNT(CASE WHEN t.status = 'Approved' THEN 1 END) as approved_tasks,
+            COUNT(CASE WHEN t.status = 'On Hold' THEN 1 END) as on_hold_tasks,
+            COUNT(CASE WHEN t.date < CURDATE() AND t.status NOT IN ('Done', 'Approved') THEN 1 END) as overdue_tasks,
+            COUNT(CASE WHEN t.priority = 'high' THEN 1 END) as high_priority,
+            AVG(t.estimated_hours) as avg_estimated_hours,
+            COUNT(CASE WHEN t.task_category IS NOT NULL THEN 1 END) as categorized_tasks
+        FROM tasks t 
+        WHERE 1=1 $dateCondition $userCondition
+    ");
+    $taskStats->execute($params);
+    $stats = $taskStats->fetch(PDO::FETCH_ASSOC);
+    
+    // File attachment statistics
+    $fileStats = $pdo->prepare("
+        SELECT 
+            COUNT(ta.id) as total_attachments,
+            COUNT(CASE WHEN ta.attachment_type = 'input' THEN 1 END) as input_files,
+            COUNT(CASE WHEN ta.attachment_type = 'output' THEN 1 END) as output_files,
+            COALESCE(SUM(ta.file_size), 0) as total_storage_used
+        FROM task_attachments ta
+        JOIN tasks t ON ta.task_id = t.id
+        WHERE 1=1 $dateCondition $userCondition
+    ");
+    $fileStats->execute($params);
+    $fileData = $fileStats->fetch(PDO::FETCH_ASSOC);
+    
+    // Work output statistics
+    $outputStats = $pdo->prepare("
+        SELECT 
+            COUNT(two.id) as total_work_outputs,
+            COUNT(CASE WHEN two.visibility = 'public' THEN 1 END) as public_outputs,
+            COUNT(CASE WHEN two.is_featured = 1 THEN 1 END) as featured_outputs,
+            SUM(two.view_count) as total_views
+        FROM task_work_outputs two
+        JOIN tasks t ON two.task_id = t.id
+        WHERE 1=1 $dateCondition $userCondition
+    ");
+    $outputStats->execute($params);
+    $outputData = $outputStats->fetch(PDO::FETCH_ASSOC);
+    
+    return array_merge($stats, $fileData, $outputData);
+}
 ?>
 
 <!DOCTYPE html>

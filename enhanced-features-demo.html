@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced Task Management - Feature Demo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3B82F6',
+                        secondary: '#6366F1',
+                        success: '#10B981',
+                        warning: '#F59E0B',
+                        danger: '#EF4444',
+                        clickup: '#7B68EE',
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        .clickup-gradient { background: linear-gradient(135deg, #7B68EE 0%, #9F7AEA 100%); }
+        .feature-card { transition: transform 0.2s, box-shadow 0.2s; }
+        .feature-card:hover { transform: translateY(-5px); box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); }
+        .demo-section { scroll-margin-top: 100px; }
+        
+        /* Custom animations */
+        @keyframes slideInUp {
+            from { transform: translateY(30px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        
+        .animate-slide-up {
+            animation: slideInUp 0.6s ease-out;
+        }
+        
+        .bg-gradient-custom {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        /* Code syntax highlighting */
+        .code-block {
+            background: #1a1a1a;
+            color: #f8f8f2;
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            overflow-x: auto;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.875rem;
+            line-height: 1.5;
+        }
+        
+        .code-comment { color: #6272a4; }
+        .code-string { color: #f1fa8c; }
+        .code-function { color: #50fa7b; }
+        .code-keyword { color: #ff79c6; }
+        
+        /* Interactive demo styles */
+        .demo-container {
+            background: #f8fafc;
+            border: 2px dashed #cbd5e1;
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 1rem 0;
+        }
+        
+        .demo-active {
+            border-color: #3b82f6;
+            background: #eff6ff;
+        }
+        
+        /* Feature showcase */
+        .feature-showcase {
+            background: linear-gradient(135deg, #f0f4f8 0%, #e2e8f0 100%);
+            border-radius: 16px;
+            padding: 2rem;
+            margin: 2rem 0;
+        }
+        
+        .feature-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: white;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-50">
+    <!-- Navigation -->
+    <nav class="bg-white shadow-lg fixed top-0 left-0 right-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center space-x-4">
+                    <div class="clickup-gradient p-2 rounded-lg">
+                        <i class="fas fa-rocket text-white text-xl"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold text-gray-800">Enhanced Task Management</h1>
+                        <p class="text-sm text-gray-600">Feature Demonstration & Integration Guide</p>
+                    </div>
+                </div>
+                
+                <div class="flex items-center space-x-4">
+                    <a href="#overview" class="text-gray-600 hover:text-blue-600 text-sm font-medium">Overview</a>
+                    <a href="#features" class="text-gray-600 hover:text-blue-600 text-sm font-medium">Features</a>
+                    <a href="#demo" class="text-gray-600 hover:text-blue-600 text-sm font-medium">Demo</a>
+                    <a href="#integration" class="text-gray-600 hover:text-blue-600 text-sm font-medium">Integration</a>
+                    <a href="enhanced-admin-dashboard.php" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                        <i class="fas fa-user-shield mr-1"></i> Admin Demo
+                    </a>
+                    <a href="enhanced-user-dashboard.php" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+                        <i class="fas fa-user mr-1"></i> User Demo
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="pt-24 pb-16 bg-gradient-custom text-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <div class="animate-slide-up">
+                <h1 class="text-5xl font-bold mb-6">Enhanced Task Management System</h1>
+                <p class="text-xl text-blue-100 mb-8 max-w-3xl mx-auto">
+                    A comprehensive task management solution with rich file attachments, work output sharing, 
+                    collaborative features, and advanced progress tracking for both administrators and users.
+                </p>
+                <div class="flex justify-center space-x-4">
+                    <button onclick="scrollToDemo()" class="px-8 py-4 bg-white text-blue-600 rounded-lg font-semibold hover:bg-blue-50 transition-colors">
+                        <i class="fas fa-play mr-2"></i> View Live Demo
+                    </button>
+                    <button onclick="scrollToFeatures()" class="px-8 py-4 border-2 border-white text-white rounded-lg font-semibold hover:bg-white hover:text-blue-600 transition-colors">
+                        <i class="fas fa-list mr-2"></i> Explore Features
+                    </button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Overview Section -->
+    <section id="overview" class="py-16 demo-section">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12">
+                <h2 class="text-4xl font-bold text-gray-800 mb-4">System Overview</h2>
+                <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+                    Built on the existing Daily Calendar system, our enhanced version provides powerful 
+                    task management capabilities for modern workflow requirements.
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <!-- For Administrators -->
+                <div class="feature-card bg-white rounded-xl shadow-lg p-8">
+                    <div class="feature-icon bg-red-500">
+                        <i class="fas fa-user-shield"></i>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-800 mb-4">For Administrators</h3>
+                    <ul class="text-gray-600 space-y-2">
+                        <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Create and assign tasks with rich details</li>
+                        <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Advanced analytics and reporting</li>
+                        <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> File and output management</li>
+                        <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></li> Team collaboration oversight</li>
+                        <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Task approval workflows</li>
+                    </ul>
+                </div>
+
+                <!-- For Users -->
+                <div class="feature-card bg-white rounded-xl shadow-lg p-8">
+                    <div class="feature-icon bg-blue-500">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-800 mb-4">For Users</h3>
+                    <ul class="text-gray-600 space-y-2">
+                        <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Intuitive task interface</li>
+                        <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> File upload and sharing</li>
+                        <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Progress tracking with media</li>
+                        <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Work output gallery</li>
+                        <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Personal performance metrics</li>
+                    </ul>
+                </div>
+
+                <!-- Technical Features -->
+                <div class="feature-card bg-white rounded-xl shadow-lg p-8">
+                    <div class="feature-icon bg-purple-500">
+                        <i class="fas fa-cogs"></i>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-800 mb-4">Technical Excellence</h3>
+                    <ul class="text-gray-600 space-y-2">
+                        <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> RESTful API architecture</li>
+                        <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Secure file handling</li>
+                        <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Database optimization</li>
+                        <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Responsive design</li>
+                        <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Backward compatibility</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="features" class="py-16 bg-gray-100 demo-section">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12">
+                <h2 class="text-4xl font-bold text-gray-800 mb-4">Enhanced Features</h2>
+                <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+                    Discover the powerful features that make this the most comprehensive task management solution.
+                </p>
+            </div>
+
+            <!-- Rich File Attachments -->
+            <div class="feature-showcase mb-12">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+                    <div>
+                        <div class="feature-icon bg-gradient-to-r from-green-400 to-green-600">
+                            <i class="fas fa-paperclip"></i>
+                        </div>
+                        <h3 class="text-3xl font-bold text-gray-800 mb-4">Rich File Attachments</h3>
+                        <p class="text-gray-600 mb-6">
+                            Support for multiple file types including images, videos, documents, and archives. 
+                            Automatic thumbnail generation, file categorization, and secure sharing capabilities.
+                        </p>
+                        <ul class="text-gray-700 space-y-2">
+                            <li class="flex items-center"><i class="fas fa-file-image text-green-500 mr-3"></i> Images (JPG, PNG, GIF, WebP, SVG)</li>
+                            <li class="flex items-center"><i class="fas fa-file-video text-red-500 mr-3"></i> Videos (MP4, WebM, OGG, QuickTime)</li>
+                            <li class="flex items-center"><i class="fas fa-file-alt text-blue-500 mr-3"></i> Documents (PDF, Word, Excel, PowerPoint)</li>
+                            <li class="flex items-center"><i class="fas fa-file-archive text-purple-500 mr-3"></i> Archives (ZIP, RAR, 7Z)</li>
+                        </ul>
+                    </div>
+                    <div class="demo-container">
+                        <div class="text-center">
+                            <div class="grid grid-cols-2 gap-4 mb-4">
+                                <div class="bg-white p-4 rounded-lg shadow">
+                                    <i class="fas fa-image text-4xl text-green-500 mb-2"></i>
+                                    <p class="text-sm text-gray-600">Auto Thumbnails</p>
+                                </div>
+                                <div class="bg-white p-4 rounded-lg shadow">
+                                    <i class="fas fa-share-alt text-4xl text-blue-500 mb-2"></i>
+                                    <p class="text-sm text-gray-600">Secure Sharing</p>
+                                </div>
+                            </div>
+                            <div class="bg-blue-100 border border-blue-300 rounded-lg p-4">
+                                <p class="text-blue-800 text-sm font-medium">
+                                    <i class="fas fa-info-circle mr-2"></i>
+                                    Drag & Drop • 50MB max • Virus scanning ready
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Work Output Sharing -->
+            <div class="feature-showcase mb-12">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+                    <div class="order-2 lg:order-1 demo-container">
+                        <div class="bg-white rounded-lg p-6 shadow-md">
+                            <div class="flex justify-between items-start mb-4">
+                                <div>
+                                    <h4 class="font-semibold text-gray-800">Landing Page Design</h4>
+                                    <p class="text-sm text-gray-600">High-fidelity mockup with interactions</p>
+                                </div>
+                                <span class="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full">Image</span>
+                            </div>
+                            <div class="flex items-center justify-between text-sm text-gray-500">
+                                <span>By Jane Smith • 2 hours ago</span>
+                                <div class="flex items-center space-x-2">
+                                    <i class="fas fa-eye"></i>
+                                    <span>24 views</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="order-1 lg:order-2">
+                        <div class="feature-icon bg-gradient-to-r from-purple-400 to-purple-600">
+                            <i class="fas fa-share"></i>
+                        </div>
+                        <h3 class="text-3xl font-bold text-gray-800 mb-4">Work Output Sharing</h3>
+                        <p class="text-gray-600 mb-6">
+                            Share completed work with team members and stakeholders. Support for various output types 
+                            with visibility controls and engagement analytics.
+                        </p>
+                        <ul class="text-gray-700 space-y-2">
+                            <li class="flex items-center"><i class="fas fa-eye text-blue-500 mr-3"></i> Public, team, or private visibility</li>
+                            <li class="flex items-center"><i class="fas fa-chart-bar text-green-500 mr-3"></i> View count and engagement metrics</li>
+                            <li class="flex items-center"><i class="fas fa-star text-yellow-500 mr-3"></i> Featured outputs showcase</li>
+                            <li class="flex items-center"><i class="fas fa-link text-purple-500 mr-3"></i> External URL support</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Enhanced Task Details -->
+            <div class="feature-showcase mb-12">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+                    <div>
+                        <div class="feature-icon bg-gradient-to-r from-orange-400 to-orange-600">
+                            <i class="fas fa-tasks"></i>
+                        </div>
+                        <h3 class="text-3xl font-bold text-gray-800 mb-4">Enhanced Task Management</h3>
+                        <p class="text-gray-600 mb-6">
+                            Comprehensive task creation with categories, specifications, requirements, and deliverables. 
+                            Perfect for complex project management needs.
+                        </p>
+                        <ul class="text-gray-700 space-y-2">
+                            <li class="flex items-center"><i class="fas fa-tag text-orange-500 mr-3"></i> Task categorization and filtering</li>
+                            <li class="flex items-center"><i class="fas fa-list-check text-green-500 mr-3"></i> Detailed specifications system</li>
+                            <li class="flex items-center"><i class="fas fa-external-link-alt text-blue-500 mr-3"></i> External resource links</li>
+                            <li class="flex items-center"><i class="fas fa-clock text-purple-500 mr-3"></i> Time estimation and tracking</li>
+                        </ul>
+                    </div>
+                    <div class="demo-container">
+                        <div class="space-y-3">
+                            <div class="bg-white p-3 rounded-lg border-l-4 border-orange-500">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-sm font-medium text-gray-800">Mobile Responsive Design</span>
+                                    <span class="text-xs text-orange-600 bg-orange-100 px-2 py-1 rounded">Requirement</span>
+                                </div>
+                                <p class="text-xs text-gray-600 mt-1">Must work on all device sizes</p>
+                            </div>
+                            <div class="bg-white p-3 rounded-lg border-l-4 border-green-500">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-sm font-medium text-gray-800">Design Mockups</span>
+                                    <span class="text-xs text-green-600 bg-green-100 px-2 py-1 rounded">Deliverable</span>
+                                </div>
+                                <p class="text-xs text-gray-600 mt-1">High-fidelity designs with interactions</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Collaboration Features -->
+            <div class="feature-showcase">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+                    <div class="order-2 lg:order-1 demo-container">
+                        <div class="space-y-3">
+                            <div class="bg-white p-3 rounded-lg flex items-center justify-between">
+                                <div class="flex items-center space-x-3">
+                                    <img src="assets/img/default-avatar.png" class="w-8 h-8 rounded-full">
+                                    <span class="text-sm font-medium">Progress Update</span>
+                                </div>
+                                <span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">75% Complete</span>
+                            </div>
+                            <div class="bg-white p-3 rounded-lg flex items-center justify-between">
+                                <div class="flex items-center space-x-3">
+                                    <img src="assets/img/default-avatar.png" class="w-8 h-8 rounded-full">
+                                    <span class="text-sm font-medium">File Uploaded</span>
+                                </div>
+                                <span class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Design.psd</span>
+                            </div>
+                            <div class="bg-white p-3 rounded-lg flex items-center justify-between">
+                                <div class="flex items-center space-x-3">
+                                    <img src="assets/img/default-avatar.png" class="w-8 h-8 rounded-full">
+                                    <span class="text-sm font-medium">Milestone Reached</span>
+                                </div>
+                                <span class="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">🏆 Major</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="order-1 lg:order-2">
+                        <div class="feature-icon bg-gradient-to-r from-blue-400 to-blue-600">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <h3 class="text-3xl font-bold text-gray-800 mb-4">Advanced Collaboration</h3>
+                        <p class="text-gray-600 mb-6">
+                            Real-time progress tracking, team collaboration features, and comprehensive activity logging 
+                            for better project visibility and communication.
+                        </p>
+                        <ul class="text-gray-700 space-y-2">
+                            <li class="flex items-center"><i class="fas fa-chart-line text-blue-500 mr-3"></i> Rich progress updates with media</li>
+                            <li class="flex items-center"><i class="fas fa-history text-green-500 mr-3"></i> Complete activity timeline</li>
+                            <li class="flex items-center"><i class="fas fa-user-friends text-purple-500 mr-3"></i> Role-based permissions</li>
+                            <li class="flex items-center"><i class="fas fa-bell text-orange-500 mr-3"></i> Smart notifications</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Interactive Demo Section -->
+    <section id="demo" class="py-16 demo-section">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12">
+                <h2 class="text-4xl font-bold text-gray-800 mb-4">Interactive Demo</h2>
+                <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+                    Experience the enhanced features with our interactive demonstration. Click the buttons below to see the system in action.
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+                <!-- Admin Interface Demo -->
+                <div class="bg-white rounded-xl shadow-lg p-8">
+                    <div class="flex items-center mb-6">
+                        <div class="bg-red-100 p-3 rounded-lg mr-4">
+                            <i class="fas fa-user-shield text-red-600 text-2xl"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-2xl font-bold text-gray-800">Admin Interface</h3>
+                            <p class="text-gray-600">Comprehensive dashboard with analytics and management tools</p>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-4 mb-6">
+                        <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                            <span class="text-sm font-medium text-gray-700">Task Management</span>
+                            <i class="fas fa-check text-green-500"></i>
+                        </div>
+                        <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                            <span class="text-sm font-medium text-gray-700">Analytics Dashboard</span>
+                            <i class="fas fa-check text-green-500"></i>
+                        </div>
+                        <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                            <span class="text-sm font-medium text-gray-700">File Management</span>
+                            <i class="fas fa-check text-green-500"></i>
+                        </div>
+                        <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                            <span class="text-sm font-medium text-gray-700">User Oversight</span>
+                            <i class="fas fa-check text-green-500"></i>
+                        </div>
+                    </div>
+                    
+                    <a href="enhanced-admin-dashboard.php" target="_blank" 
+                        class="w-full px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center">
+                        <i class="fas fa-external-link-alt mr-2"></i>
+                        Launch Admin Demo
+                    </a>
+                </div>
+
+                <!-- User Interface Demo -->
+                <div class="bg-white rounded-xl shadow-lg p-8">
+                    <div class="flex items-center mb-6">
+                        <div class="bg-blue-100 p-3 rounded-lg mr-4">
+                            <i class="fas fa-user text-blue-600 text-2xl"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-2xl font-bold text-gray-800">User Interface</h3>
+                            <p class="text-gray-600">Intuitive interface focused on productivity and ease of use</p>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-4 mb-6">
+                        <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                            <span class="text-sm font-medium text-gray-700">Personal Dashboard</span>
+                            <i class="fas fa-check text-green-500"></i>
+                        </div>
+                        <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                            <span class="text-sm font-medium text-gray-700">File Upload & Sharing</span>
+                            <i class="fas fa-check text-green-500"></i>
+                        </div>
+                        <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                            <span class="text-sm font-medium text-gray-700">Progress Tracking</span>
+                            <i class="fas fa-check text-green-500"></i>
+                        </div>
+                        <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                            <span class="text-sm font-medium text-gray-700">Performance Metrics</span>
+                            <i class="fas fa-check text-green-500"></i>
+                        </div>
+                    </div>
+                    
+                    <a href="enhanced-user-dashboard.php" target="_blank" 
+                        class="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center">
+                        <i class="fas fa-external-link-alt mr-2"></i>
+                        Launch User Demo
+                    </a>
+                </div>
+            </div>
+
+            <!-- API Demo -->
+            <div class="bg-white rounded-xl shadow-lg p-8">
+                <h3 class="text-2xl font-bold text-gray-800 mb-6 text-center">API Integration Example</h3>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div>
+                        <h4 class="text-lg font-semibold text-gray-700 mb-3">Enhanced Task Creation</h4>
+                        <div class="code-block text-sm">
+<span class="code-comment">// Create task with attachments and specifications</span>
+<span class="code-keyword">const</span> formData = <span class="code-keyword">new</span> <span class="code-function">FormData</span>();
+formData.<span class="code-function">append</span>(<span class="code-string">'action'</span>, <span class="code-string">'create_task'</span>);
+formData.<span class="code-function">append</span>(<span class="code-string">'title'</span>, <span class="code-string">'Design Landing Page'</span>);
+formData.<span class="code-function">append</span>(<span class="code-string">'task_category'</span>, <span class="code-string">'Design'</span>);
+formData.<span class="code-function">append</span>(<span class="code-string">'specifications'</span>, <span class="code-function">JSON.stringify</span>([{
+    <span class="code-string">type</span>: <span class="code-string">'requirement'</span>,
+    <span class="code-string">title</span>: <span class="code-string">'Mobile Responsive'</span>,
+    <span class="code-string">description</span>: <span class="code-string">'Must work on all devices'</span>
+}]));
+
+<span class="code-keyword">const</span> response = <span class="code-keyword">await</span> <span class="code-function">fetch</span>(<span class="code-string">'api/tasks.php'</span>, {
+    <span class="code-string">method</span>: <span class="code-string">'POST'</span>,
+    <span class="code-string">body</span>: formData
+});
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h4 class="text-lg font-semibold text-gray-700 mb-3">Work Output Sharing</h4>
+                        <div class="code-block text-sm">
+<span class="code-comment">// Share work output with team</span>
+<span class="code-keyword">const</span> outputData = {
+    <span class="code-string">action</span>: <span class="code-string">'add_work_output'</span>,
+    <span class="code-string">task_id</span>: <span class="code-string">123</span>,
+    <span class="code-string">output_type</span>: <span class="code-string">'image'</span>,
+    <span class="code-string">title</span>: <span class="code-string">'Final Design Mockup'</span>,
+    <span class="code-string">description</span>: <span class="code-string">'High-fidelity design with interactions'</span>,
+    <span class="code-string">visibility</span>: <span class="code-string">'team'</span>,
+    <span class="code-string">external_url</span>: <span class="code-string">'https://figma.com/design/123'</span>
+};
+
+<span class="code-keyword">const</span> result = <span class="code-keyword">await</span> <span class="code-function">fetch</span>(<span class="code-string">'api/tasks.php'</span>, {
+    <span class="code-string">method</span>: <span class="code-string">'POST'</span>,
+    <span class="code-string">body</span>: <span class="code-function">JSON.stringify</span>(outputData)
+});
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Integration Guide -->
+    <section id="integration" class="py-16 bg-gray-100 demo-section">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12">
+                <h2 class="text-4xl font-bold text-gray-800 mb-4">Integration Guide</h2>
+                <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+                    Step-by-step instructions to integrate the enhanced task management system into your existing application.
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
+                <!-- Step 1 -->
+                <div class="bg-white rounded-xl shadow-lg p-8 text-center">
+                    <div class="w-16 h-16 bg-blue-500 rounded-full flex items-center justify-center text-white text-2xl font-bold mx-auto mb-4">1</div>
+                    <h3 class="text-xl font-bold text-gray-800 mb-4">Database Setup</h3>
+                    <p class="text-gray-600 mb-4">Apply the enhanced schema updates to your existing database.</p>
+                    <div class="code-block text-left text-sm">
+<span class="code-comment"># Apply database updates</span>
+mysql -u username -p database_name &lt; database/task_enhancements.sql
+                    </div>
+                </div>
+
+                <!-- Step 2 -->
+                <div class="bg-white rounded-xl shadow-lg p-8 text-center">
+                    <div class="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center text-white text-2xl font-bold mx-auto mb-4">2</div>
+                    <h3 class="text-xl font-bold text-gray-800 mb-4">Upload Files</h3>
+                    <p class="text-gray-600 mb-4">Copy the enhanced API files and JavaScript components.</p>
+                    <div class="text-left text-sm bg-gray-100 p-3 rounded">
+                        <div class="mb-2">📁 api/tasks.php (enhanced)</div>
+                        <div class="mb-2">📁 api/attachments.php (new)</div>
+                        <div class="mb-2">📁 assets/js/enhanced-task-manager.js</div>
+                        <div>📁 enhanced-*-dashboard.php</div>
+                    </div>
+                </div>
+
+                <!-- Step 3 -->
+                <div class="bg-white rounded-xl shadow-lg p-8 text-center">
+                    <div class="w-16 h-16 bg-purple-500 rounded-full flex items-center justify-center text-white text-2xl font-bold mx-auto mb-4">3</div>
+                    <h3 class="text-xl font-bold text-gray-800 mb-4">Configure & Test</h3>
+                    <p class="text-gray-600 mb-4">Set up file permissions and test the enhanced features.</p>
+                    <div class="code-block text-left text-sm">
+<span class="code-comment"># Set permissions</span>
+chmod 755 uploads/tasks/
+<span class="code-comment"># Test features</span>
+curl -X POST api/tasks.php
+                    </div>
+                </div>
+            </div>
+
+            <!-- Configuration Details -->
+            <div class="bg-white rounded-xl shadow-lg p-8">
+                <h3 class="text-2xl font-bold text-gray-800 mb-6">Configuration Details</h3>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div>
+                        <h4 class="text-lg font-semibold text-gray-700 mb-3">Required PHP Settings</h4>
+                        <div class="code-block">
+<span class="code-comment">; php.ini settings</span>
+upload_max_filesize = 50M
+post_max_size = 50M
+max_execution_time = 300
+memory_limit = 256M
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h4 class="text-lg font-semibold text-gray-700 mb-3">Directory Structure</h4>
+                        <div class="code-block">
+daily/
+├── api/
+│   ├── tasks.php (enhanced)
+│   └── attachments.php (new)
+├── assets/js/
+│   └── enhanced-task-manager.js
+├── database/
+│   └── task_enhancements.sql
+└── uploads/tasks/ (create)
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- API Documentation -->
+            <div class="mt-8 bg-white rounded-xl shadow-lg p-8">
+                <h3 class="text-2xl font-bold text-gray-800 mb-6">API Reference</h3>
+                
+                <div class="space-y-6">
+                    <!-- Task Creation -->
+                    <div class="border-l-4 border-blue-500 pl-4">
+                        <h4 class="text-lg font-semibold text-gray-700">Enhanced Task Creation</h4>
+                        <p class="text-gray-600 text-sm mb-2">POST /api/tasks.php</p>
+                        <div class="bg-gray-50 p-3 rounded text-sm">
+                            <strong>New Parameters:</strong> task_category, requirements, deliverables, external_links, specifications
+                        </div>
+                    </div>
+                    
+                    <!-- File Upload -->
+                    <div class="border-l-4 border-green-500 pl-4">
+                        <h4 class="text-lg font-semibold text-gray-700">File Attachment</h4>
+                        <p class="text-gray-600 text-sm mb-2">POST /api/attachments.php</p>
+                        <div class="bg-gray-50 p-3 rounded text-sm">
+                            <strong>Actions:</strong> upload, get_attachments, delete_attachment, create_share_link
+                        </div>
+                    </div>
+                    
+                    <!-- Work Outputs -->
+                    <div class="border-l-4 border-purple-500 pl-4">
+                        <h4 class="text-lg font-semibold text-gray-700">Work Output Sharing</h4>
+                        <p class="text-gray-600 text-sm mb-2">POST /api/tasks.php</p>
+                        <div class="bg-gray-50 p-3 rounded text-sm">
+                            <strong>Actions:</strong> add_work_output, get_work_outputs, update_progress
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-white py-12">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+                <div>
+                    <div class="flex items-center space-x-2 mb-4">
+                        <div class="clickup-gradient p-2 rounded-lg">
+                            <i class="fas fa-rocket text-white"></i>
+                        </div>
+                        <span class="text-xl font-bold">Enhanced Tasks</span>
+                    </div>
+                    <p class="text-gray-400">
+                        Advanced task management system with rich features for modern workflows.
+                    </p>
+                </div>
+                
+                <div>
+                    <h3 class="text-lg font-semibold mb-4">Features</h3>
+                    <ul class="text-gray-400 space-y-2">
+                        <li>File Attachments</li>
+                        <li>Work Output Sharing</li>
+                        <li>Progress Tracking</li>
+                        <li>Team Collaboration</li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h3 class="text-lg font-semibold mb-4">Documentation</h3>
+                    <ul class="text-gray-400 space-y-2">
+                        <li><a href="#integration" class="hover:text-white">Integration Guide</a></li>
+                        <li><a href="ENHANCED_FEATURES_README.md" class="hover:text-white">Full Documentation</a></li>
+                        <li><a href="#demo" class="hover:text-white">API Reference</a></li>
+                        <li><a href="#features" class="hover:text-white">Feature List</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h3 class="text-lg font-semibold mb-4">Quick Start</h3>
+                    <div class="space-y-2">
+                        <a href="enhanced-admin-dashboard.php" 
+                            class="block px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors text-center">
+                            Admin Demo
+                        </a>
+                        <a href="enhanced-user-dashboard.php" 
+                            class="block px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-center">
+                            User Demo
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="border-t border-gray-700 mt-8 pt-8 text-center text-gray-400">
+                <p>&copy; 2024 Enhanced Task Management System. Built for productivity and collaboration.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        function scrollToDemo() {
+            document.getElementById('demo').scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        function scrollToFeatures() {
+            document.getElementById('features').scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        // Smooth scrolling for navigation links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth' });
+                }
+            });
+        });
+        
+        // Add animation on scroll
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+        
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '1';
+                    entry.target.style.transform = 'translateY(0)';
+                }
+            });
+        }, observerOptions);
+        
+        // Observe all feature cards
+        document.querySelectorAll('.feature-card, .feature-showcase').forEach(el => {
+            el.style.opacity = '0';
+            el.style.transform = 'translateY(20px)';
+            el.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+            observer.observe(el);
+        });
+    </script>
+</body>
+</html>

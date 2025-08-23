@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task API Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .result { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .success { background-color: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+        .error { background-color: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+        .info { background-color: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }
+        pre { background: #f8f9fa; padding: 10px; border: 1px solid #dee2e6; border-radius: 3px; }
+        button { padding: 10px 20px; margin: 5px; border: none; border-radius: 5px; cursor: pointer; }
+        .btn-primary { background: #007bff; color: white; }
+        .btn-success { background: #28a745; color: white; }
+    </style>
+</head>
+<body>
+    <h1>Task API Test</h1>
+    <div id="results"></div>
+    
+    <h2>Test Actions</h2>
+    <button class="btn-primary" onclick="testCreateTask()">Test Task Creation</button>
+    <button class="btn-success" onclick="testGetTasks()">Test Get Tasks</button>
+
+    <script>
+        async function addResult(type, title, message) {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = `result ${type}`;
+            div.innerHTML = `<strong>${title}</strong><br>${message}`;
+            results.appendChild(div);
+        }
+
+        async function testCreateTask() {
+            addResult('info', 'Testing Task Creation', 'Creating a test task...');
+            
+            try {
+                const taskData = {
+                    action: 'create_task',
+                    title: 'Test Task - ' + new Date().toISOString(),
+                    details: 'This is a test task created from the test page',
+                    assigned_to: '1',
+                    date: new Date().toISOString().split('T')[0],
+                    priority: 'medium',
+                    estimated_hours: '2'
+                };
+                
+                const response = await fetch('api/tasks-simple.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Cache-Control': 'no-cache'
+                    },
+                    credentials: 'same-origin',
+                    body: JSON.stringify(taskData)
+                });
+                
+                addResult('info', 'Response Status', `HTTP ${response.status}: ${response.statusText}`);
+                
+                const responseText = await response.text();
+                addResult('info', 'Raw Response', `<pre>${responseText}</pre>`);
+                
+                if (response.ok) {
+                    try {
+                        const data = JSON.parse(responseText);
+                        if (data.success) {
+                            addResult('success', 'Task Created!', `Task created successfully with ID: ${data.task_id}`);
+                        } else {
+                            addResult('error', 'Task Creation Failed', data.message);
+                            if (data.debug) {
+                                addResult('info', 'Debug Info', `<pre>${JSON.stringify(data.debug, null, 2)}</pre>`);
+                            }
+                        }
+                    } catch (e) {
+                        addResult('error', 'JSON Parse Error', e.message);
+                    }
+                } else {
+                    addResult('error', 'HTTP Error', `Server returned ${response.status}`);
+                }
+                
+            } catch (error) {
+                addResult('error', 'Network Error', error.message);
+            }
+        }
+        
+        async function testGetTasks() {
+            addResult('info', 'Testing Get Tasks', 'Fetching tasks for today...');
+            
+            try {
+                const response = await fetch('api/tasks-simple.php?action=get_tasks', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Cache-Control': 'no-cache'
+                    },
+                    credentials: 'same-origin'
+                });
+                
+                const responseText = await response.text();
+                
+                if (response.ok) {
+                    try {
+                        const data = JSON.parse(responseText);
+                        if (data.success) {
+                            addResult('success', 'Tasks Retrieved', `Found ${data.count} tasks for ${data.date}`);
+                            if (data.tasks && data.tasks.length > 0) {
+                                let taskList = '<ul>';
+                                data.tasks.forEach(task => {
+                                    taskList += `<li><strong>${task.title}</strong> - Assigned to: ${task.assigned_name} - Status: ${task.status}</li>`;
+                                });
+                                taskList += '</ul>';
+                                addResult('info', 'Task List', taskList);
+                            }
+                        } else {
+                            addResult('error', 'Get Tasks Failed', data.message);
+                        }
+                    } catch (e) {
+                        addResult('error', 'JSON Parse Error', e.message);
+                    }
+                } else {
+                    addResult('error', 'HTTP Error', `Server returned ${response.status}`);
+                }
+                
+            } catch (error) {
+                addResult('error', 'Network Error', error.message);
+            }
+        }
+        
+        // Auto-test on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            addResult('info', 'Page Loaded', 'Ready to test task creation API');
+        });
+    </script>
+</body>
+</html>
