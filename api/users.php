@@ -2,6 +2,9 @@
 // Users API - Clean version
 header('Content-Type: application/json');
 header('Cache-Control: no-cache, must-revalidate');
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
 
 try {
     // Start session if not already started
@@ -16,7 +19,11 @@ try {
     // Check if user is logged in
     if (!isset($_SESSION['user_id']) || !isset($_SESSION['role'])) {
         http_response_code(401);
-        echo json_encode(['success' => false, 'message' => 'Authentication required']);
+        echo json_encode([
+            'success' => false, 
+            'message' => 'Authentication required',
+            'debug' => 'Session check failed - user_id: ' . (isset($_SESSION['user_id']) ? 'set' : 'not set') . ', role: ' . (isset($_SESSION['role']) ? 'set' : 'not set')
+        ]);
         exit;
     }
     
@@ -79,8 +86,16 @@ try {
             getAllUsers($pdo, $input);
             break;
             
+        case 'test_connection':
+            testConnection($pdo);
+            break;
+            
         default:
-            echo json_encode(['success' => false, 'message' => 'Invalid action']);
+            echo json_encode(['success' => false, 'message' => 'Invalid action', 'available_actions' => [
+                'get_active_users', 'get_user_profile', 'update_profile', 'get_user_tasks', 
+                'get_user_stats', 'create_user', 'delete_user', 'toggle_user_status', 
+                'reset_password', 'get_all_users', 'test_connection'
+            ]]);
     }
     
 } catch (Exception $e) {
@@ -401,13 +416,22 @@ function createUser($pdo, $input) {
         
         $userId = $pdo->lastInsertId();
         
-        // Log activity using existing function
-        require_once '../includes/functions.php';
-        logActivity($_SESSION['user_id'], 'user_created', 'user', $userId, [
-            'name' => $input['name'],
-            'email' => $input['email'],
-            'role' => $input['role'] ?? 'user'
-        ]);
+        // Log activity using existing function (with error handling)
+        try {
+            if (file_exists('../includes/functions.php')) {
+                require_once '../includes/functions.php';
+                if (function_exists('logActivity')) {
+                    logActivity($_SESSION['user_id'], 'user_created', 'user', $userId, [
+                        'name' => $input['name'],
+                        'email' => $input['email'],
+                        'role' => $input['role'] ?? 'user'
+                    ]);
+                }
+            }
+        } catch (Exception $logError) {
+            // Don't fail the user creation if logging fails
+            error_log("Failed to log activity: " . $logError->getMessage());
+        }
         
         $pdo->commit();
         
@@ -469,11 +493,19 @@ function deleteUser($pdo, $input) {
         $stmt = $pdo->prepare("UPDATE users SET is_active = FALSE, updated_at = NOW() WHERE id = ?");
         $stmt->execute([$userId]);
         
-        // Log activity
-        require_once '../includes/functions.php';
-        logActivity($_SESSION['user_id'], 'user_deleted', 'user', $userId, [
-            'name' => $user['name']
-        ]);
+        // Log activity (with error handling)
+        try {
+            if (file_exists('../includes/functions.php')) {
+                require_once '../includes/functions.php';
+                if (function_exists('logActivity')) {
+                    logActivity($_SESSION['user_id'], 'user_deleted', 'user', $userId, [
+                        'name' => $user['name']
+                    ]);
+                }
+            }
+        } catch (Exception $logError) {
+            error_log("Failed to log activity: " . $logError->getMessage());
+        }
         
         $pdo->commit();
         
@@ -522,13 +554,21 @@ function toggleUserStatus($pdo, $input) {
         $stmt = $pdo->prepare("UPDATE users SET is_active = ?, updated_at = NOW() WHERE id = ?");
         $stmt->execute([$newStatus, $userId]);
         
-        // Log activity
-        require_once '../includes/functions.php';
-        logActivity($_SESSION['user_id'], 'user_status_changed', 'user', $userId, [
-            'name' => $user['name'],
-            'from' => $user['is_active'] ? 'active' : 'inactive',
-            'to' => $newStatus ? 'active' : 'inactive'
-        ]);
+        // Log activity (with error handling)
+        try {
+            if (file_exists('../includes/functions.php')) {
+                require_once '../includes/functions.php';
+                if (function_exists('logActivity')) {
+                    logActivity($_SESSION['user_id'], 'user_status_changed', 'user', $userId, [
+                        'name' => $user['name'],
+                        'from' => $user['is_active'] ? 'active' : 'inactive',
+                        'to' => $newStatus ? 'active' : 'inactive'
+                    ]);
+                }
+            }
+        } catch (Exception $logError) {
+            error_log("Failed to log activity: " . $logError->getMessage());
+        }
         
         $pdo->commit();
         
@@ -573,11 +613,19 @@ function resetUserPassword($pdo, $input) {
         $stmt = $pdo->prepare("UPDATE users SET password = ?, force_password_change = TRUE, updated_at = NOW() WHERE id = ?");
         $stmt->execute([$hashedPassword, $userId]);
         
-        // Log activity
-        require_once '../includes/functions.php';
-        logActivity($_SESSION['user_id'], 'password_reset', 'user', $userId, [
-            'name' => $user['name']
-        ]);
+        // Log activity (with error handling)
+        try {
+            if (file_exists('../includes/functions.php')) {
+                require_once '../includes/functions.php';
+                if (function_exists('logActivity')) {
+                    logActivity($_SESSION['user_id'], 'password_reset', 'user', $userId, [
+                        'name' => $user['name']
+                    ]);
+                }
+            }
+        } catch (Exception $logError) {
+            error_log("Failed to log activity: " . $logError->getMessage());
+        }
         
         $pdo->commit();
         
@@ -640,6 +688,30 @@ function getAllUsers($pdo, $input) {
         
     } catch (Exception $e) {
         echo json_encode(['success' => false, 'message' => 'Failed to fetch users: ' . $e->getMessage()]);
+    }
+}
+
+function testConnection($pdo) {
+    try {
+        $stmt = $pdo->query("SELECT 1 as test, NOW() as current_time");
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        echo json_encode([
+            'success' => true,
+            'message' => 'Database connection working',
+            'test_result' => $result,
+            'session_info' => [
+                'user_id' => $_SESSION['user_id'] ?? 'not set',
+                'role' => $_SESSION['role'] ?? 'not set',
+                'session_id' => session_id()
+            ]
+        ]);
+        
+    } catch (Exception $e) {
+        echo json_encode([
+            'success' => false, 
+            'message' => 'Database test failed: ' . $e->getMessage()
+        ]);
     }
 }
 ?>

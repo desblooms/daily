@@ -32,8 +32,8 @@ class Database {
                 // Log the error instead of displaying it
                 error_log("Database connection failed: " . $e->getMessage());
                 
-                // Throw exception to be caught by API handlers
-                throw new Exception("Database connection failed: " . $e->getMessage());
+                // Return more user-friendly error message
+                throw new Exception("Database connection failed. Please check your database configuration and ensure the database server is running.");
             }
         }
         return $this->conn;

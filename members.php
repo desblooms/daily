@@ -605,8 +605,16 @@ $users = $stmt->fetchAll();
         document.getElementById('addMemberForm').addEventListener('submit', function(e) {
             e.preventDefault();
             
+            // Show loading state
+            const submitBtn = this.querySelector('button[type="submit"]');
+            const originalText = submitBtn.textContent;
+            submitBtn.textContent = 'Adding...';
+            submitBtn.disabled = true;
+            
             const formData = new FormData(this);
             const data = Object.fromEntries(formData.entries());
+            
+            console.log('Sending data:', data); // Debug log
             
             fetch('./api/users.php', {
                 method: 'POST',
@@ -618,19 +626,42 @@ $users = $stmt->fetchAll();
                     ...data
                 })
             })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    showSuccessMessage('Member added successfully!');
-                    closeAddMemberModal();
-                    setTimeout(() => location.reload(), 1500);
-                } else {
-                    alert('Error: ' + data.message);
+            .then(response => {
+                console.log('Response status:', response.status); // Debug log
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                return response.text(); // Get as text first to handle potential parsing issues
+            })
+            .then(text => {
+                console.log('Response text:', text); // Debug log
+                
+                try {
+                    const data = JSON.parse(text);
+                    
+                    if (data.success) {
+                        showSuccessMessage('Member added successfully!');
+                        closeAddMemberModal();
+                        setTimeout(() => location.reload(), 1500);
+                    } else {
+                        alert('Error: ' + (data.message || 'Unknown error'));
+                    }
+                } catch (parseError) {
+                    console.error('JSON Parse Error:', parseError);
+                    console.error('Raw response:', text);
+                    alert('Server response error. Check console for details.');
                 }
             })
             .catch(error => {
-                console.error('Error:', error);
-                alert('Network error. Please try again.');
+                console.error('Fetch Error:', error);
+                alert('Network error: ' + error.message + '. Please check your connection and try again.');
+            })
+            .finally(() => {
+                // Reset button
+                submitBtn.textContent = originalText;
+                submitBtn.disabled = false;
             });
         });
 
@@ -659,36 +690,60 @@ $users = $stmt->fetchAll();
                     user_id: currentDeleteUserId
                 })
             })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    showSuccessMessage('Member deleted successfully!');
-                    closeDeleteModal();
-                    setTimeout(() => location.reload(), 1500);
-                } else {
-                    alert('Error: ' + data.message);
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                return response.text();
+            })
+            .then(text => {
+                try {
+                    const data = JSON.parse(text);
+                    if (data.success) {
+                        showSuccessMessage('Member deleted successfully!');
+                        closeDeleteModal();
+                        setTimeout(() => location.reload(), 1500);
+                    } else {
+                        alert('Error: ' + (data.message || 'Unknown error'));
+                    }
+                } catch (parseError) {
+                    console.error('JSON Parse Error:', parseError);
+                    console.error('Raw response:', text);
+                    alert('Server response error. Check console for details.');
                 }
             })
             .catch(error => {
-                console.error('Error:', error);
-                alert('Network error. Please try again.');
+                console.error('Delete Error:', error);
+                alert('Network error: ' + error.message + '. Please try again.');
             });
         }
 
         // View member details
         function viewMemberDetails(userId) {
             fetch(`./api/users.php?action=get_user_profile&user_id=${userId}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        showMemberDetailsModal(data.user);
-                    } else {
-                        alert('Error: ' + data.message);
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    return response.text();
+                })
+                .then(text => {
+                    try {
+                        const data = JSON.parse(text);
+                        if (data.success) {
+                            showMemberDetailsModal(data.user);
+                        } else {
+                            alert('Error: ' + (data.message || 'Unknown error'));
+                        }
+                    } catch (parseError) {
+                        console.error('JSON Parse Error:', parseError);
+                        console.error('Raw response:', text);
+                        alert('Server response error. Check console for details.');
                     }
                 })
                 .catch(error => {
-                    console.error('Error:', error);
-                    alert('Network error. Please try again.');
+                    console.error('View Details Error:', error);
+                    alert('Network error: ' + error.message + '. Please try again.');
                 });
         }
 
