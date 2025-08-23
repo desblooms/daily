@@ -167,6 +167,7 @@ function deleteUserFixed($pdo, $input) {
     }
     
     $userId = $input['user_id'] ?? null;
+    $deleteType = $input['delete_type'] ?? 'soft'; // 'soft' or 'hard'
     
     if (!$userId) {
         echo json_encode(['success' => false, 'message' => 'Missing user ID']);
@@ -179,23 +180,62 @@ function deleteUserFixed($pdo, $input) {
         return;
     }
     
+    // Get user info before deletion
+    $stmt = $pdo->prepare("SELECT name, email FROM users WHERE id = ?");
+    $stmt->execute([$userId]);
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$user) {
+        echo json_encode(['success' => false, 'message' => 'User not found']);
+        return;
+    }
+    
     try {
         $pdo->beginTransaction();
         
-        // Soft delete - mark as inactive
-        $stmt = $pdo->prepare("UPDATE users SET is_active = 0 WHERE id = ?");
-        $stmt->execute([$userId]);
+        if ($deleteType === 'hard') {
+            // Hard delete - permanently remove from database
+            
+            // First check if user has any active tasks
+            $stmt = $pdo->prepare("SELECT COUNT(*) FROM tasks WHERE assigned_to = ? AND status NOT IN ('Done', 'Approved')");
+            $stmt->execute([$userId]);
+            $activeTasks = $stmt->fetchColumn();
+            
+            if ($activeTasks > 0) {
+                echo json_encode(['success' => false, 'message' => "Cannot permanently delete user with {$activeTasks} active tasks. Complete or reassign tasks first."]);
+                return;
+            }
+            
+            // Delete user permanently
+            $stmt = $pdo->prepare("DELETE FROM users WHERE id = ?");
+            $stmt->execute([$userId]);
+            
+            $message = "User '{$user['name']}' permanently deleted from database";
+            
+        } else {
+            // Soft delete - mark as inactive (default)
+            $stmt = $pdo->prepare("UPDATE users SET is_active = 0 WHERE id = ?");
+            $stmt->execute([$userId]);
+            
+            $message = "User '{$user['name']}' deactivated (soft deleted)";
+        }
         
         if ($stmt->rowCount() === 0) {
-            echo json_encode(['success' => false, 'message' => 'User not found']);
+            echo json_encode(['success' => false, 'message' => 'No changes made - user may already be deleted']);
             return;
         }
         
-        // Skip logActivity
-        
         $pdo->commit();
         
-        echo json_encode(['success' => true, 'message' => 'User deactivated successfully']);
+        echo json_encode([
+            'success' => true, 
+            'message' => $message,
+            'delete_type' => $deleteType,
+            'user_info' => [
+                'name' => $user['name'],
+                'email' => $user['email']
+            ]
+        ]);
         
     } catch (Exception $e) {
         $pdo->rollback();

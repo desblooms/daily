@@ -458,7 +458,26 @@ $users = $stmt->fetchAll();
                     <i class="fas fa-exclamation-triangle text-red-600 text-2xl"></i>
                 </div>
                 <h2 class="text-xl font-bold text-gray-900 mb-2">Delete Member</h2>
-                <p class="text-gray-600">Are you sure you want to delete <strong id="deleteMemberName"></strong>? This action cannot be undone.</p>
+                <p class="text-gray-600 mb-4">Choose how to delete <strong id="deleteMemberName"></strong>:</p>
+                
+                <!-- Delete Type Options -->
+                <div class="text-left space-y-3 mb-4">
+                    <label class="flex items-start gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+                        <input type="radio" name="deleteType" value="soft" checked class="mt-1">
+                        <div>
+                            <div class="font-medium text-gray-900">Deactivate (Recommended)</div>
+                            <div class="text-sm text-gray-600">User disappears from interface but data is preserved. Can be restored later.</div>
+                        </div>
+                    </label>
+                    
+                    <label class="flex items-start gap-3 p-3 border border-red-200 rounded-lg hover:bg-red-50 cursor-pointer">
+                        <input type="radio" name="deleteType" value="hard" class="mt-1">
+                        <div>
+                            <div class="font-medium text-red-900">Permanently Delete</div>
+                            <div class="text-sm text-red-600">⚠️ User is completely removed from database. Cannot be undone!</div>
+                        </div>
+                    </label>
+                </div>
             </div>
             
             <div class="flex gap-3">
@@ -468,7 +487,7 @@ $users = $stmt->fetchAll();
                 </button>
                 <button onclick="deleteMember()" 
                         class="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors">
-                    Delete
+                    Delete User
                 </button>
             </div>
         </div>
@@ -669,6 +688,18 @@ $users = $stmt->fetchAll();
         function confirmDeleteMember(userId, userName) {
             currentDeleteUserId = userId;
             document.getElementById('deleteMemberName').textContent = userName;
+            
+            // Reset delete type to soft delete (recommended)
+            const softDeleteRadio = document.querySelector('input[name="deleteType"][value="soft"]');
+            if (softDeleteRadio) {
+                softDeleteRadio.checked = true;
+            }
+            
+            // Reset button state
+            const deleteBtn = document.querySelector('#deleteModal button[onclick="deleteMember()"]');
+            deleteBtn.textContent = 'Delete User';
+            deleteBtn.disabled = false;
+            
             document.getElementById('deleteModal').classList.remove('hidden');
         }
 
@@ -680,6 +711,15 @@ $users = $stmt->fetchAll();
         function deleteMember() {
             if (!currentDeleteUserId) return;
             
+            // Get selected delete type
+            const deleteType = document.querySelector('input[name="deleteType"]:checked')?.value || 'soft';
+            
+            // Update button to show loading
+            const deleteBtn = document.querySelector('#deleteModal button[onclick="deleteMember()"]');
+            const originalText = deleteBtn.textContent;
+            deleteBtn.textContent = 'Deleting...';
+            deleteBtn.disabled = true;
+            
             fetch('./api/users-fixed.php', {
                 method: 'POST',
                 headers: {
@@ -687,7 +727,8 @@ $users = $stmt->fetchAll();
                 },
                 body: JSON.stringify({
                     action: 'delete_user',
-                    user_id: currentDeleteUserId
+                    user_id: currentDeleteUserId,
+                    delete_type: deleteType
                 })
             })
             .then(response => {
@@ -700,7 +741,9 @@ $users = $stmt->fetchAll();
                 try {
                     const data = JSON.parse(text);
                     if (data.success) {
-                        showSuccessMessage('Member deleted successfully!');
+                        const deleteType = data.delete_type || 'soft';
+                        const message = deleteType === 'hard' ? 'Member permanently deleted from database!' : 'Member deactivated successfully!';
+                        showSuccessMessage(message);
                         closeDeleteModal();
                         setTimeout(() => location.reload(), 1500);
                     } else {
@@ -715,6 +758,11 @@ $users = $stmt->fetchAll();
             .catch(error => {
                 console.error('Delete Error:', error);
                 alert('Network error: ' + error.message + '. Please try again.');
+            })
+            .finally(() => {
+                // Reset button state
+                deleteBtn.textContent = originalText;
+                deleteBtn.disabled = false;
             });
         }
 
