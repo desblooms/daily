@@ -23,10 +23,16 @@ try {
         throw new Exception('Database connection failed');
     }
     
-    // Get input data first
+    // Get input data first - handle both JSON and form data
     $input = [];
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        $input = json_decode(file_get_contents('php://input'), true) ?? $_POST;
+        // Check if it's multipart/form-data (file upload) or JSON
+        $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
+        if (strpos($contentType, 'multipart/form-data') !== false) {
+            $input = $_POST; // Form data with files
+        } else {
+            $input = json_decode(file_get_contents('php://input'), true) ?? $_POST;
+        }
     } else {
         $input = $_GET;
     }
@@ -100,10 +106,10 @@ function createTask($pdo, $input) {
             return;
         }
         
-        // Insert task
+        // Insert task with reference link
         $sql = "
-            INSERT INTO tasks (title, details, assigned_to, date, created_by, updated_by, priority, estimated_hours, due_time, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending')
+            INSERT INTO tasks (title, details, assigned_to, date, created_by, updated_by, priority, estimated_hours, due_time, status, reference_link)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', ?)
         ";
         
         $stmt = $pdo->prepare($sql);
@@ -116,7 +122,8 @@ function createTask($pdo, $input) {
             $_SESSION['user_id'],
             $input['priority'] ?? 'medium',
             !empty($input['estimated_hours']) ? (float)$input['estimated_hours'] : null,
-            $input['due_time'] ?? null
+            $input['due_time'] ?? null,
+            !empty($input['reference_link']) ? trim($input['reference_link']) : null
         ]);
         
         if (!$result) {
@@ -125,11 +132,18 @@ function createTask($pdo, $input) {
         
         $taskId = $pdo->lastInsertId();
         
+        // Handle file attachment if provided
+        $attachmentInfo = null;
+        if (isset($_FILES['attachment']) && $_FILES['attachment']['error'] === UPLOAD_ERR_OK) {
+            $attachmentInfo = handleFileUpload($_FILES['attachment'], $taskId);
+        }
+        
         echo json_encode([
             'success' => true, 
             'message' => 'Task created successfully',
             'task_id' => $taskId,
-            'debug' => 'Simple API worked'
+            'attachment' => $attachmentInfo,
+            'debug' => 'Simple API worked with file upload support'
         ]);
         
     } catch (Exception $e) {
@@ -176,6 +190,50 @@ function getTasks($pdo, $input) {
             'success' => false, 
             'message' => 'Failed to get tasks: ' . $e->getMessage()
         ]);
+    }
+}
+
+function handleFileUpload($file, $taskId) {
+    try {
+        // Create uploads directory if it doesn't exist
+        $uploadDir = '../uploads/tasks/';
+        if (!is_dir($uploadDir)) {
+            mkdir($uploadDir, 0755, true);
+        }
+        
+        // Validate file type
+        $allowedTypes = ['pdf', 'doc', 'docx', 'txt', 'jpg', 'jpeg', 'png', 'gif', 'xlsx', 'xls', 'csv'];
+        $fileExt = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+        
+        if (!in_array($fileExt, $allowedTypes)) {
+            throw new Exception('File type not allowed. Allowed: ' . implode(', ', $allowedTypes));
+        }
+        
+        // Validate file size (max 10MB)
+        if ($file['size'] > 10 * 1024 * 1024) {
+            throw new Exception('File too large. Maximum size is 10MB.');
+        }
+        
+        // Generate unique filename
+        $fileName = 'task_' . $taskId . '_' . time() . '_' . uniqid() . '.' . $fileExt;
+        $filePath = $uploadDir . $fileName;
+        
+        // Move uploaded file
+        if (!move_uploaded_file($file['tmp_name'], $filePath)) {
+            throw new Exception('Failed to upload file');
+        }
+        
+        return [
+            'filename' => $fileName,
+            'original_name' => $file['name'],
+            'size' => $file['size'],
+            'type' => $fileExt,
+            'path' => 'uploads/tasks/' . $fileName
+        ];
+        
+    } catch (Exception $e) {
+        error_log("File upload error: " . $e->getMessage());
+        return ['error' => $e->getMessage()];
     }
 }
 ?>

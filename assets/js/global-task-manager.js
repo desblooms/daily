@@ -337,6 +337,20 @@ class GlobalTaskManager {
                         </div>
                     </div>
                     
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">File Attachment</label>
+                        <input type="file" name="attachment" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100"
+                               accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.gif,.xlsx,.xls,.csv">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Reference Link</label>
+                        <input type="url" name="reference_link" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                               placeholder="https://example.com">
+                    </div>
+                    
                     <div class="flex justify-end space-x-3 pt-4">
                         <button type="button" onclick="window.globalTaskManager.closeAddTaskModal()"
                                 class="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
@@ -373,15 +387,28 @@ class GlobalTaskManager {
     async handleTaskSubmission(form) {
         try {
             const formData = new FormData(form);
+            
+            // Create a new FormData object to send with file
+            const submitData = new FormData();
+            submitData.append('action', 'create_task');
+            submitData.append('title', formData.get('title'));
+            submitData.append('details', formData.get('details'));
+            submitData.append('assigned_to', formData.get('assigned_to'));
+            submitData.append('date', formData.get('date'));
+            submitData.append('priority', formData.get('priority'));
+            submitData.append('estimated_hours', formData.get('estimated_hours') || '');
+            submitData.append('due_time', formData.get('due_time') || '');
+            submitData.append('reference_link', formData.get('reference_link') || '');
+            
+            // Add file if selected
+            const fileInput = form.querySelector('input[name="attachment"]');
+            if (fileInput && fileInput.files[0]) {
+                submitData.append('attachment', fileInput.files[0]);
+            }
+            
             const taskData = {
-                action: 'create_task',
                 title: formData.get('title'),
-                details: formData.get('details'),
-                assigned_to: formData.get('assigned_to'),
-                date: formData.get('date'),
-                priority: formData.get('priority'),
-                estimated_hours: formData.get('estimated_hours') || null,
-                due_time: formData.get('due_time') || null
+                assigned_to: formData.get('assigned_to')
             };
 
             // Validate required fields
@@ -401,13 +428,16 @@ class GlobalTaskManager {
             submitButton.textContent = 'Creating...';
             submitButton.disabled = true;
 
-            // Make API call
-            const response = await this.apiCall('api/tasks-simple.php', {
+            // Make API call with FormData for file upload
+            const response = await fetch('api/tasks-simple.php', {
                 method: 'POST',
-                body: JSON.stringify(taskData)
+                body: submitData,
+                credentials: 'same-origin'
             });
+            
+            const result = await response.json();
 
-            if (response.success) {
+            if (result.success) {
                 this.showNotification('Task created successfully!', 'success');
                 this.closeAddTaskModal();
                 
@@ -418,7 +448,7 @@ class GlobalTaskManager {
                     setTimeout(() => location.reload(), 1000);
                 }
             } else {
-                this.showNotification(response.message || 'Failed to create task', 'error');
+                this.showNotification(result.message || 'Failed to create task', 'error');
             }
 
         } catch (error) {
