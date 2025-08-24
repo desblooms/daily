@@ -303,15 +303,7 @@ if ($_POST && isset($_POST['action'])) {
         </div>
         <?php endif; ?>
         
-        <!-- Debug Info (remove this after testing) -->
-        <?php if (!empty($attachmentDebug) && ($_SESSION['role'] === 'admin' || true)): ?>
-        <div class="bg-yellow-50 border-l-4 border-yellow-400 p-3 mb-2">
-            <p class="text-xs font-medium text-yellow-800 mb-1">Attachment Debug Info:</p>
-            <?php foreach ($attachmentDebug as $debug): ?>
-                <p class="text-xs text-yellow-700"><?= htmlspecialchars($debug) ?></p>
-            <?php endforeach; ?>
-        </div>
-        <?php endif; ?>
+  
 
         <!-- Attachments -->
         <div class="bg-white p-3 rounded-lg shadow-sm mb-2">

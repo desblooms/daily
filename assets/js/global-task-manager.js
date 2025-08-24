@@ -282,9 +282,7 @@ class GlobalTaskManager {
                             class="text-gray-400 hover:text-gray-600 text-xl font-bold">×</button>
                 </div>
                 
-                <div class="mb-2 p-2 bg-blue-50 text-blue-800 text-xs rounded">
-                    Updated modal with file attachment and reference link support
-                </div>
+                
                 
                 <form id="globalAddTaskForm" class="space-y-4">
                     <div>
