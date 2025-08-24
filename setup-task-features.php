@@ -27,7 +27,7 @@ try {
         $results[] = "✓ reference_link column already exists";
     }
     
-    // 2. Create task_attachments table (drop existing if has wrong structure)
+    // 2. Create task_attachments table (handle foreign key constraints)
     $stmt = $pdo->prepare("SHOW TABLES LIKE 'task_attachments'");
     $stmt->execute();
     $tableExists = $stmt->fetch();
@@ -39,7 +39,34 @@ try {
         $hasCorrectStructure = $stmt->fetch();
         
         if (!$hasCorrectStructure) {
+            // Disable foreign key checks temporarily
+            $pdo->exec("SET FOREIGN_KEY_CHECKS = 0");
+            
+            // Drop foreign key constraints if they exist
+            try {
+                $stmt = $pdo->prepare("
+                    SELECT CONSTRAINT_NAME 
+                    FROM information_schema.TABLE_CONSTRAINTS 
+                    WHERE TABLE_NAME = 'task_attachments' 
+                    AND TABLE_SCHEMA = DATABASE()
+                    AND CONSTRAINT_TYPE = 'FOREIGN KEY'
+                ");
+                $stmt->execute();
+                $foreignKeys = $stmt->fetchAll();
+                
+                foreach ($foreignKeys as $fk) {
+                    try {
+                        $pdo->exec("ALTER TABLE task_attachments DROP FOREIGN KEY " . $fk['CONSTRAINT_NAME']);
+                    } catch (Exception $e) {
+                        // Ignore FK drop errors
+                    }
+                }
+            } catch (Exception $e) {
+                // Ignore FK query errors
+            }
+            
             $pdo->exec("DROP TABLE task_attachments");
+            $pdo->exec("SET FOREIGN_KEY_CHECKS = 1");
             $results[] = "✓ Dropped old task_attachments table with incorrect structure";
         }
     }
@@ -57,11 +84,12 @@ try {
             uploaded_by INT,
             uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             INDEX idx_task_id (task_id),
-            INDEX idx_uploaded_at (uploaded_at)
+            INDEX idx_uploaded_at (uploaded_at),
+            INDEX idx_uploaded_by (uploaded_by)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
     $stmt->execute();
-    $results[] = "✓ Created task_attachments table with correct structure";
+    $results[] = "✓ Created task_attachments table with correct structure (no foreign key constraints)";
     
     // 3. Create task_reassign_requests table
     $stmt = $pdo->prepare("
@@ -76,17 +104,15 @@ try {
             handled_by INT NULL,
             handled_at TIMESTAMP NULL,
             admin_comment TEXT NULL,
-            FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
-            FOREIGN KEY (requested_by) REFERENCES users(id) ON DELETE CASCADE,
-            FOREIGN KEY (requested_to) REFERENCES users(id) ON DELETE CASCADE,
-            FOREIGN KEY (handled_by) REFERENCES users(id) ON DELETE SET NULL,
             INDEX idx_task_id (task_id),
             INDEX idx_status (status),
-            INDEX idx_requested_at (requested_at)
+            INDEX idx_requested_at (requested_at),
+            INDEX idx_requested_by (requested_by),
+            INDEX idx_requested_to (requested_to)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
     $stmt->execute();
-    $results[] = "✓ Created task_reassign_requests table";
+    $results[] = "✓ Created task_reassign_requests table (no foreign key constraints)";
     
     // 4. Create work outputs table (for future use)
     $stmt = $pdo->prepare("
@@ -105,15 +131,14 @@ try {
             created_by INT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
-            FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
             INDEX idx_task_id (task_id),
             INDEX idx_visibility (visibility),
-            INDEX idx_created_at (created_at)
+            INDEX idx_created_at (created_at),
+            INDEX idx_created_by (created_by)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
     $stmt->execute();
-    $results[] = "✓ Created task_work_outputs table";
+    $results[] = "✓ Created task_work_outputs table (no foreign key constraints)";
     
     // 5. Create task progress updates table
     $stmt = $pdo->prepare("
@@ -125,14 +150,13 @@ try {
             hours_worked DECIMAL(5,2) DEFAULT 0,
             created_by INT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
-            FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
             INDEX idx_task_id (task_id),
-            INDEX idx_created_at (created_at)
+            INDEX idx_created_at (created_at),
+            INDEX idx_created_by (created_by)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
     $stmt->execute();
-    $results[] = "✓ Created task_progress_updates table";
+    $results[] = "✓ Created task_progress_updates table (no foreign key constraints)";
     
     // 6. Create uploads directory
     $uploadDir = 'uploads/tasks/';
