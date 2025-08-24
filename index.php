@@ -111,6 +111,26 @@ $notifications = getUserNotifications($_SESSION['user_id'], true, 5);
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= $pageTitle ?> - Daily Calendar</title>
+    
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#3B82F6">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Daily Calendar">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="application-name" content="Daily Calendar">
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json">
+    
+    <!-- PWA Icons -->
+    <link rel="icon" type="image/png" sizes="192x192" href="/assets/icons/icon-192x192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="/assets/icons/icon-512x512.png">
+    <link rel="apple-touch-icon" href="/assets/icons/icon-192x192.png">
+    
+    <!-- Preload critical resources -->
+    <link rel="preload" href="/assets/js/notification-manager.js" as="script">
+    <link rel="preload" href="/sw.js" as="script">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script>
@@ -164,6 +184,7 @@ $notifications = getUserNotifications($_SESSION['user_id'], true, 5);
     window.userId = <?= $_SESSION['user_id'] ?? 'null' ?>;
     window.userName = '<?= htmlspecialchars($_SESSION['user_name'] ?? 'Unknown') ?>';
 </script>
+    <script src="assets/js/notification-manager.js?v=<?= time() ?>"></script>
 </head>
 <body class="bg-gray-50 min-h-screen pb-20">
     <!-- Header with Glass Effect -->

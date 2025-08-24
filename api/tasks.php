@@ -17,6 +17,7 @@ try {
     // Include required files
     require_once '../includes/db.php';
     require_once '../includes/auth.php';
+    require_once '../includes/notification-helper.php';
     
     // Check if user is logged in
     if (!isset($_SESSION['user_id']) || !isset($_SESSION['role'])) {
@@ -299,6 +300,12 @@ function createNewTask($pdo, $input) {
         
         $pdo->commit();
         
+        // Send notification for task creation
+        sendTaskNotification('task_created', $taskId, [
+            'assigned_to' => (int)$input['assigned_to'],
+            'created_by' => $_SESSION['user_id']
+        ]);
+        
         echo json_encode([
             'success' => true, 
             'message' => 'Task created successfully',
@@ -473,6 +480,15 @@ function updateTask($pdo, $input) {
         
         $pdo->commit();
         
+        // Send notifications for task updates
+        if ($isReassignment && $newAssignedTo) {
+            sendTaskNotification('task_reassigned', $taskId, [
+                'old_assignee' => $oldAssignedTo,
+                'new_assignee' => $newAssignedTo,
+                'reassigned_by' => $_SESSION['user_id']
+            ]);
+        }
+        
         echo json_encode(['success' => true, 'message' => 'Task updated successfully']);
         
     } catch (Exception $e) {
@@ -544,6 +560,13 @@ function updateTaskStatus($pdo, $input) {
         ]);
         
         $pdo->commit();
+        
+        // Send notification for status change
+        sendTaskNotification('status_changed', $taskId, [
+            'old_status' => $task['status'],
+            'new_status' => $newStatus,
+            'updated_by' => $_SESSION['user_id']
+        ]);
         
         echo json_encode(['success' => true, 'message' => 'Status updated successfully']);
         
