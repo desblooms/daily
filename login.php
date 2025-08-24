@@ -253,32 +253,7 @@ $maxLoginAttempts = getSystemSetting('max_login_attempts', 5);
                 </button>
             </form>
             
-            <!-- Demo Accounts -->
-            <div class="mt-8 pt-6 border-t border-gray-200">
-                <p class="text-xs text-gray-500 text-center mb-4 font-medium">Demo Accounts for Testing</p>
-                <div class="grid grid-cols-1 gap-3">
-                    <div class="flex justify-between items-center p-3 bg-gradient-to-r from-purple-50 to-blue-50 rounded-xl border border-purple-100">
-                        <div>
-                            <p class="text-sm font-semibold text-gray-800">Administrator</p>
-                            <p class="text-xs text-gray-500">admin@example.com</p>
-                        </div>
-                        <button onclick="fillCredentials('admin@example.com', 'admin123')" 
-                                class="px-3 py-1 bg-gradient-to-r from-purple-500 to-blue-500 text-white text-xs rounded-lg hover:from-purple-600 hover:to-blue-600 transition-all duration-200 font-medium">
-                            Use Account
-                        </button>
-                    </div>
-                    <div class="flex justify-between items-center p-3 bg-gradient-to-r from-blue-50 to-green-50 rounded-xl border border-blue-100">
-                        <div>
-                            <p class="text-sm font-semibold text-gray-800">Team Member</p>
-                            <p class="text-xs text-gray-500">user@example.com</p>
-                        </div>
-                        <button onclick="fillCredentials('user@example.com', 'user123')" 
-                                class="px-3 py-1 bg-gradient-to-r from-blue-500 to-green-500 text-white text-xs rounded-lg hover:from-blue-600 hover:to-green-600 transition-all duration-200 font-medium">
-                            Use Account
-                        </button>
-                    </div>
-                </div>
-            </div>
+    
 
             <!-- Security Notice -->
             <div class="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-xl">
