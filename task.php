@@ -11,12 +11,19 @@ if (!$taskId) {
     exit;
 }
 
-// Get task details
+// Get comprehensive task details
 $stmt = $pdo->prepare("
-    SELECT t.*, u.name as assigned_name, c.name as created_name 
+    SELECT t.*, 
+           u.name as assigned_name, 
+           u.email as assigned_email,
+           u.department as assigned_department,
+           c.name as created_name,
+           c.email as created_email,
+           a.name as approved_by_name
     FROM tasks t 
     LEFT JOIN users u ON t.assigned_to = u.id 
     LEFT JOIN users c ON t.created_by = c.id 
+    LEFT JOIN users a ON t.approved_by = a.id
     WHERE t.id = ?
 ");
 $stmt->execute([$taskId]);
@@ -31,6 +38,49 @@ if (!$task) {
 if ($_SESSION['role'] !== 'admin' && $task['assigned_to'] != $_SESSION['user_id']) {
     header('Location: index.php');
     exit;
+}
+
+// Get attachments (check if table exists first)
+$attachments = [];
+try {
+    $stmt = $pdo->prepare("SHOW TABLES LIKE 'task_attachments'");
+    $stmt->execute();
+    if ($stmt->fetch()) {
+        $stmt = $pdo->prepare("
+            SELECT * FROM task_attachments 
+            WHERE task_id = ? 
+            ORDER BY uploaded_at DESC
+        ");
+        $stmt->execute([$taskId]);
+        $attachments = $stmt->fetchAll();
+    }
+} catch (Exception $e) {
+    error_log("Error fetching attachments: " . $e->getMessage());
+}
+
+// Get reassignment requests (check if table exists first)
+$reassignRequests = [];
+try {
+    $stmt = $pdo->prepare("SHOW TABLES LIKE 'task_reassign_requests'");
+    $stmt->execute();
+    if ($stmt->fetch()) {
+        $stmt = $pdo->prepare("
+            SELECT trr.*, 
+                   u_from.name as requested_by_name,
+                   u_to.name as requested_to_name,
+                   u_admin.name as handled_by_name
+            FROM task_reassign_requests trr
+            LEFT JOIN users u_from ON trr.requested_by = u_from.id
+            LEFT JOIN users u_to ON trr.requested_to = u_to.id  
+            LEFT JOIN users u_admin ON trr.handled_by = u_admin.id
+            WHERE trr.task_id = ? 
+            ORDER BY trr.requested_at DESC
+        ");
+        $stmt->execute([$taskId]);
+        $reassignRequests = $stmt->fetchAll();
+    }
+} catch (Exception $e) {
+    error_log("Error fetching reassign requests: " . $e->getMessage());
 }
 
 // Get status logs
@@ -64,8 +114,9 @@ if ($_POST && isset($_POST['action'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Task Details</title>
+    <title>Task Details - <?= htmlspecialchars($task['title']) ?></title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body class="bg-gray-100 min-h-screen pb-16">
     <div class="p-2">
@@ -85,29 +136,97 @@ if ($_POST && isset($_POST['action'])) {
         <?php endif; ?>
 
         <!-- Task Information -->
-        <div class="bg-white p-3 rounded-lg shadow-sm mb-2">
-            <h2 class="text-lg font-semibold mb-2"><?= htmlspecialchars($task['title']) ?></h2>
+        <div class="bg-white p-4 rounded-lg shadow-sm mb-3">
+            <div class="flex justify-between items-start mb-3">
+                <h2 class="text-xl font-bold text-gray-900 flex-1 mr-2"><?= htmlspecialchars($task['title']) ?></h2>
+                <span class="px-3 py-1 text-sm rounded-full font-medium <?= getStatusColor($task['status']) ?>">
+                    <?= $task['status'] ?>
+                </span>
+            </div>
             
-            <div class="space-y-2 text-sm">
-                <div class="flex justify-between">
-                    <span class="text-gray-600">Assigned to:</span>
-                    <span><?= htmlspecialchars($task['assigned_name']) ?></span>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <!-- Left Column -->
+                <div class="space-y-3">
+                    <div class="flex items-center">
+                        <i class="fas fa-user text-blue-500 w-5"></i>
+                        <span class="text-gray-600 ml-2 mr-3">Assigned to:</span>
+                        <div>
+                            <div class="font-medium"><?= htmlspecialchars($task['assigned_name']) ?></div>
+                            <?php if ($task['assigned_email']): ?>
+                                <div class="text-xs text-gray-500"><?= htmlspecialchars($task['assigned_email']) ?></div>
+                            <?php endif; ?>
+                            <?php if ($task['assigned_department']): ?>
+                                <div class="text-xs text-gray-500"><?= htmlspecialchars($task['assigned_department']) ?></div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center">
+                        <i class="fas fa-user-plus text-green-500 w-5"></i>
+                        <span class="text-gray-600 ml-2 mr-3">Created by:</span>
+                        <div>
+                            <div class="font-medium"><?= htmlspecialchars($task['created_name']) ?></div>
+                            <?php if ($task['created_email']): ?>
+                                <div class="text-xs text-gray-500"><?= htmlspecialchars($task['created_email']) ?></div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    
+                    <?php if ($task['approved_by_name']): ?>
+                    <div class="flex items-center">
+                        <i class="fas fa-check-circle text-purple-500 w-5"></i>
+                        <span class="text-gray-600 ml-2 mr-3">Approved by:</span>
+                        <div class="font-medium text-purple-700"><?= htmlspecialchars($task['approved_by_name']) ?></div>
+                    </div>
+                    <?php endif; ?>
                 </div>
-                <div class="flex justify-between">
-                    <span class="text-gray-600">Created by:</span>
-                    <span><?= htmlspecialchars($task['created_name']) ?></span>
+                
+                <!-- Right Column -->
+                <div class="space-y-3">
+                    <div class="flex items-center">
+                        <i class="fas fa-calendar text-indigo-500 w-5"></i>
+                        <span class="text-gray-600 ml-2 mr-3">Due Date:</span>
+                        <span class="font-medium"><?= date('d M Y', strtotime($task['date'])) ?></span>
+                        <?php if ($task['due_time']): ?>
+                            <span class="text-gray-500 ml-2"><?= date('g:i A', strtotime($task['due_time'])) ?></span>
+                        <?php endif; ?>
+                    </div>
+                    
+                    <?php if ($task['priority']): ?>
+                    <div class="flex items-center">
+                        <i class="fas fa-flag text-orange-500 w-5"></i>
+                        <span class="text-gray-600 ml-2 mr-3">Priority:</span>
+                        <span class="px-2 py-1 text-xs rounded-full font-medium <?= getPriorityColor($task['priority']) ?>">
+                            <?= ucfirst($task['priority']) ?>
+                        </span>
+                    </div>
+                    <?php endif; ?>
+                    
+                    <?php if ($task['estimated_hours']): ?>
+                    <div class="flex items-center">
+                        <i class="fas fa-clock text-yellow-500 w-5"></i>
+                        <span class="text-gray-600 ml-2 mr-3">Estimated:</span>
+                        <span class="font-medium"><?= $task['estimated_hours'] ?> hours</span>
+                    </div>
+                    <?php endif; ?>
+                    
+                    <?php if ($task['task_category']): ?>
+                    <div class="flex items-center">
+                        <i class="fas fa-tag text-teal-500 w-5"></i>
+                        <span class="text-gray-600 ml-2 mr-3">Category:</span>
+                        <span class="px-2 py-1 text-xs rounded-full bg-teal-100 text-teal-800 font-medium">
+                            <?= htmlspecialchars($task['task_category']) ?>
+                        </span>
+                    </div>
+                    <?php endif; ?>
                 </div>
+            </div>
+            
+            <!-- Timeline Info -->
+            <div class="mt-4 pt-3 border-t border-gray-200 text-xs text-gray-500 space-y-1">
                 <div class="flex justify-between">
-                    <span class="text-gray-600">Date:</span>
-                    <span><?= date('d M Y', strtotime($task['date'])) ?></span>
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-gray-600">Created:</span>
-                    <span><?= date('d M Y H:i', strtotime($task['created_at'])) ?></span>
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-gray-600">Last Updated:</span>
-                    <span><?= date('d M Y H:i', strtotime($task['updated_at'])) ?></span>
+                    <span>Created: <?= date('d M Y H:i', strtotime($task['created_at'])) ?></span>
+                    <span>Last Updated: <?= date('d M Y H:i', strtotime($task['updated_at'])) ?></span>
                 </div>
             </div>
         </div>
@@ -130,6 +249,125 @@ if ($_POST && isset($_POST['action'])) {
                 <p class="text-sm text-gray-700"><?= nl2br(htmlspecialchars($task['details'])) ?></p>
             <?php endif; ?>
         </div>
+        
+        <!-- Reference Link -->
+        <?php if ($task['reference_link']): ?>
+        <div class="bg-white p-3 rounded-lg shadow-sm mb-2">
+            <h3 class="text-sm font-semibold mb-2 flex items-center">
+                <i class="fas fa-external-link-alt text-blue-500 mr-2"></i>
+                Reference Link
+            </h3>
+            <div class="bg-blue-50 p-3 rounded-lg">
+                <a href="<?= htmlspecialchars($task['reference_link']) ?>" 
+                   target="_blank" 
+                   class="text-blue-600 hover:text-blue-800 break-all text-sm flex items-center">
+                    <?= htmlspecialchars($task['reference_link']) ?>
+                    <i class="fas fa-external-link-alt ml-2 text-xs"></i>
+                </a>
+            </div>
+        </div>
+        <?php endif; ?>
+        
+        <!-- Attachments -->
+        <?php if (!empty($attachments)): ?>
+        <div class="bg-white p-3 rounded-lg shadow-sm mb-2">
+            <h3 class="text-sm font-semibold mb-2 flex items-center">
+                <i class="fas fa-paperclip text-green-500 mr-2"></i>
+                Attachments (<?= count($attachments) ?>)
+            </h3>
+            <div class="space-y-2">
+                <?php foreach ($attachments as $attachment): ?>
+                    <div class="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                        <div class="flex items-center flex-1">
+                            <div class="flex-shrink-0">
+                                <?php 
+                                $ext = strtolower(pathinfo($attachment['filename'], PATHINFO_EXTENSION));
+                                $iconClass = getFileIcon($ext);
+                                ?>
+                                <i class="<?= $iconClass ?> text-lg mr-3"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <div class="font-medium text-sm text-gray-900 truncate">
+                                    <?= htmlspecialchars($attachment['original_name'] ?? $attachment['filename']) ?>
+                                </div>
+                                <div class="text-xs text-gray-500">
+                                    <?= formatFileSize($attachment['file_size'] ?? 0) ?> • 
+                                    <?= date('M j, Y g:i A', strtotime($attachment['uploaded_at'])) ?>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-2 ml-4">
+                            <a href="<?= htmlspecialchars($attachment['file_path']) ?>" 
+                               target="_blank"
+                               class="text-blue-600 hover:text-blue-800 text-sm">
+                                <i class="fas fa-download"></i>
+                            </a>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+        <?php endif; ?>
+        
+        <!-- Reassignment Requests -->
+        <?php if (!empty($reassignRequests)): ?>
+        <div class="bg-white p-3 rounded-lg shadow-sm mb-2">
+            <h3 class="text-sm font-semibold mb-2 flex items-center">
+                <i class="fas fa-exchange-alt text-purple-500 mr-2"></i>
+                Reassignment Requests (<?= count($reassignRequests) ?>)
+            </h3>
+            <div class="space-y-3">
+                <?php foreach ($reassignRequests as $request): ?>
+                    <div class="border border-gray-200 rounded-lg p-3">
+                        <div class="flex justify-between items-start mb-2">
+                            <div class="flex-1">
+                                <div class="text-sm">
+                                    <span class="font-medium"><?= htmlspecialchars($request['requested_by_name']) ?></span>
+                                    <span class="text-gray-600">requested to reassign to</span>
+                                    <span class="font-medium"><?= htmlspecialchars($request['requested_to_name']) ?></span>
+                                </div>
+                                <div class="text-xs text-gray-500 mt-1">
+                                    <?= date('M j, Y g:i A', strtotime($request['requested_at'])) ?>
+                                </div>
+                            </div>
+                            <div class="ml-3">
+                                <?php
+                                $statusColor = match($request['status']) {
+                                    'pending' => 'bg-yellow-100 text-yellow-800',
+                                    'approved' => 'bg-green-100 text-green-800',
+                                    'rejected' => 'bg-red-100 text-red-800',
+                                    default => 'bg-gray-100 text-gray-800'
+                                };
+                                ?>
+                                <span class="px-2 py-1 text-xs rounded-full font-medium <?= $statusColor ?>">
+                                    <?= ucfirst($request['status']) ?>
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <?php if ($request['reason']): ?>
+                            <div class="text-sm text-gray-700 bg-gray-50 p-2 rounded mb-2">
+                                <strong>Reason:</strong> <?= nl2br(htmlspecialchars($request['reason'])) ?>
+                            </div>
+                        <?php endif; ?>
+                        
+                        <?php if ($request['status'] !== 'pending'): ?>
+                            <div class="text-xs text-gray-500 border-t pt-2 mt-2">
+                                <?= ucfirst($request['status']) ?> by 
+                                <span class="font-medium"><?= htmlspecialchars($request['handled_by_name']) ?></span>
+                                on <?= date('M j, Y g:i A', strtotime($request['handled_at'])) ?>
+                                <?php if ($request['admin_comment']): ?>
+                                    <div class="mt-1 text-gray-700">
+                                        <strong>Comment:</strong> <?= htmlspecialchars($request['admin_comment']) ?>
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+        <?php endif; ?>
 
         <!-- Status Actions -->
         <?php if ($task['assigned_to'] == $_SESSION['user_id']): ?>
@@ -656,5 +894,61 @@ function getStatusColor($status) {
         case 'On Hold': return 'bg-red-100 text-red-700';
         default: return 'bg-gray-100 text-gray-700';
     }
+}
+
+function getPriorityColor($priority) {
+    switch (strtolower($priority)) {
+        case 'high': return 'bg-red-100 text-red-800';
+        case 'medium': return 'bg-yellow-100 text-yellow-800';
+        case 'low': return 'bg-green-100 text-green-800';
+        default: return 'bg-gray-100 text-gray-800';
+    }
+}
+
+function getFileIcon($extension) {
+    switch (strtolower($extension)) {
+        case 'pdf':
+            return 'fas fa-file-pdf text-red-500';
+        case 'doc':
+        case 'docx':
+            return 'fas fa-file-word text-blue-500';
+        case 'xls':
+        case 'xlsx':
+        case 'csv':
+            return 'fas fa-file-excel text-green-500';
+        case 'jpg':
+        case 'jpeg':
+        case 'png':
+        case 'gif':
+        case 'bmp':
+        case 'svg':
+            return 'fas fa-file-image text-purple-500';
+        case 'txt':
+            return 'fas fa-file-alt text-gray-500';
+        case 'zip':
+        case 'rar':
+        case '7z':
+            return 'fas fa-file-archive text-orange-500';
+        default:
+            return 'fas fa-file text-gray-400';
+    }
+}
+
+function formatFileSize($bytes) {
+    if ($bytes >= 1073741824) {
+        $bytes = number_format($bytes / 1073741824, 2) . ' GB';
+    } elseif ($bytes >= 1048576) {
+        $bytes = number_format($bytes / 1048576, 2) . ' MB';
+    } elseif ($bytes >= 1024) {
+        $bytes = number_format($bytes / 1024, 2) . ' KB';
+    } elseif ($bytes > 1) {
+        $bytes = $bytes . ' bytes';
+    } elseif ($bytes == 1) {
+        $bytes = $bytes . ' byte';
+    } else {
+        $bytes = '0 bytes';
+    }
+    
+    return $bytes;
 }
 ?>
