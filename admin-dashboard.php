@@ -42,7 +42,7 @@ $recentActivities = getRecentActivities(20);
             }
         }
     </script>
-<script src="assets/js/global-task-manager.js"></script>
+<script src="assets/js/global-task-manager.js?v=<?= time() ?>"></script>
 
 
     <style>
