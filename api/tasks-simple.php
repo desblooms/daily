@@ -194,6 +194,8 @@ function getTasks($pdo, $input) {
 }
 
 function handleFileUpload($file, $taskId) {
+    global $pdo;
+    
     try {
         // Create uploads directory if it doesn't exist
         $uploadDir = '../uploads/tasks/';
@@ -223,12 +225,50 @@ function handleFileUpload($file, $taskId) {
             throw new Exception('Failed to upload file');
         }
         
+        // Store in database if table exists and has correct structure
+        $dbStored = false;
+        try {
+            $stmt = $pdo->prepare("SHOW TABLES LIKE 'task_attachments'");
+            $stmt->execute();
+            if ($stmt->fetch()) {
+                // Check if table has required columns
+                $stmt = $pdo->prepare("SHOW COLUMNS FROM task_attachments LIKE 'original_name'");
+                $stmt->execute();
+                $hasColumns = $stmt->fetch();
+                
+                if ($hasColumns) {
+                    $stmt = $pdo->prepare("
+                        INSERT INTO task_attachments 
+                        (task_id, filename, original_name, file_path, file_size, file_type, attachment_type, uploaded_by, uploaded_at) 
+                        VALUES (?, ?, ?, ?, ?, ?, 'input', ?, NOW())
+                    ");
+                    
+                    $stmt->execute([
+                        $taskId,
+                        $fileName,
+                        $file['name'],
+                        'uploads/tasks/' . $fileName,
+                        $file['size'],
+                        $fileExt,
+                        $_SESSION['user_id'] ?? 1
+                    ]);
+                    $dbStored = true;
+                } else {
+                    error_log("task_attachments table exists but missing required columns");
+                }
+            }
+        } catch (Exception $dbError) {
+            error_log("Database insert error: " . $dbError->getMessage());
+            // Don't fail the upload if DB insert fails
+        }
+        
         return [
             'filename' => $fileName,
             'original_name' => $file['name'],
             'size' => $file['size'],
             'type' => $fileExt,
-            'path' => 'uploads/tasks/' . $fileName
+            'path' => 'uploads/tasks/' . $fileName,
+            'stored_in_db' => $dbStored
         ];
         
     } catch (Exception $e) {

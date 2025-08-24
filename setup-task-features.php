@@ -27,7 +27,23 @@ try {
         $results[] = "✓ reference_link column already exists";
     }
     
-    // 2. Create task_attachments table
+    // 2. Create task_attachments table (drop existing if has wrong structure)
+    $stmt = $pdo->prepare("SHOW TABLES LIKE 'task_attachments'");
+    $stmt->execute();
+    $tableExists = $stmt->fetch();
+    
+    if ($tableExists) {
+        // Check if table has correct columns
+        $stmt = $pdo->prepare("SHOW COLUMNS FROM task_attachments LIKE 'original_name'");
+        $stmt->execute();
+        $hasCorrectStructure = $stmt->fetch();
+        
+        if (!$hasCorrectStructure) {
+            $pdo->exec("DROP TABLE task_attachments");
+            $results[] = "✓ Dropped old task_attachments table with incorrect structure";
+        }
+    }
+    
     $stmt = $pdo->prepare("
         CREATE TABLE IF NOT EXISTS task_attachments (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -40,14 +56,12 @@ try {
             attachment_type ENUM('input', 'output') DEFAULT 'input',
             uploaded_by INT,
             uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
-            FOREIGN KEY (uploaded_by) REFERENCES users(id) ON DELETE SET NULL,
             INDEX idx_task_id (task_id),
             INDEX idx_uploaded_at (uploaded_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
     $stmt->execute();
-    $results[] = "✓ Created task_attachments table";
+    $results[] = "✓ Created task_attachments table with correct structure";
     
     // 3. Create task_reassign_requests table
     $stmt = $pdo->prepare("

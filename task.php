@@ -40,22 +40,57 @@ if ($_SESSION['role'] !== 'admin' && $task['assigned_to'] != $_SESSION['user_id'
     exit;
 }
 
-// Get attachments (check if table exists first)
+// Get attachments - improved with better debugging
 $attachments = [];
+$attachmentDebug = [];
 try {
+    // Check if table exists
     $stmt = $pdo->prepare("SHOW TABLES LIKE 'task_attachments'");
     $stmt->execute();
-    if ($stmt->fetch()) {
+    $tableExists = $stmt->fetch();
+    $attachmentDebug[] = "Table exists: " . ($tableExists ? 'YES' : 'NO');
+    
+    if ($tableExists) {
+        // Get attachments
         $stmt = $pdo->prepare("
-            SELECT * FROM task_attachments 
-            WHERE task_id = ? 
-            ORDER BY uploaded_at DESC
+            SELECT ta.*, u.name as uploaded_by_name
+            FROM task_attachments ta 
+            LEFT JOIN users u ON ta.uploaded_by = u.id
+            WHERE ta.task_id = ? 
+            ORDER BY ta.uploaded_at DESC
         ");
         $stmt->execute([$taskId]);
         $attachments = $stmt->fetchAll();
+        $attachmentDebug[] = "Attachments found: " . count($attachments);
+        
+        // Also try to get from uploads directory directly as fallback
+        $uploadDir = 'uploads/tasks/';
+        if (is_dir($uploadDir)) {
+            $taskFiles = glob($uploadDir . 'task_' . $taskId . '_*');
+            $attachmentDebug[] = "Files in directory: " . count($taskFiles);
+            
+            // If no DB records but files exist, show them anyway
+            if (empty($attachments) && !empty($taskFiles)) {
+                foreach ($taskFiles as $file) {
+                    $filename = basename($file);
+                    $attachments[] = [
+                        'id' => 0,
+                        'task_id' => $taskId,
+                        'filename' => $filename,
+                        'original_name' => $filename,
+                        'file_path' => 'uploads/tasks/' . $filename,
+                        'file_size' => filesize($file),
+                        'uploaded_at' => date('Y-m-d H:i:s', filemtime($file)),
+                        'uploaded_by_name' => 'Unknown'
+                    ];
+                }
+                $attachmentDebug[] = "Added files from directory: " . count($taskFiles);
+            }
+        }
     }
 } catch (Exception $e) {
     error_log("Error fetching attachments: " . $e->getMessage());
+    $attachmentDebug[] = "Error: " . $e->getMessage();
 }
 
 // Get reassignment requests (check if table exists first)
@@ -268,13 +303,27 @@ if ($_POST && isset($_POST['action'])) {
         </div>
         <?php endif; ?>
         
+        <!-- Debug Info (remove this after testing) -->
+        <?php if (!empty($attachmentDebug) && ($_SESSION['role'] === 'admin' || true)): ?>
+        <div class="bg-yellow-50 border-l-4 border-yellow-400 p-3 mb-2">
+            <p class="text-xs font-medium text-yellow-800 mb-1">Attachment Debug Info:</p>
+            <?php foreach ($attachmentDebug as $debug): ?>
+                <p class="text-xs text-yellow-700"><?= htmlspecialchars($debug) ?></p>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
+
         <!-- Attachments -->
-        <?php if (!empty($attachments)): ?>
         <div class="bg-white p-3 rounded-lg shadow-sm mb-2">
             <h3 class="text-sm font-semibold mb-2 flex items-center">
                 <i class="fas fa-paperclip text-green-500 mr-2"></i>
                 Attachments (<?= count($attachments) ?>)
+                <?php if (empty($attachments)): ?>
+                    <span class="ml-2 text-xs text-gray-500 font-normal">- No attachments found</span>
+                <?php endif; ?>
             </h3>
+            
+            <?php if (!empty($attachments)): ?>
             <div class="space-y-2">
                 <?php foreach ($attachments as $attachment): ?>
                     <div class="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
@@ -306,8 +355,14 @@ if ($_POST && isset($_POST['action'])) {
                     </div>
                 <?php endforeach; ?>
             </div>
+            <?php else: ?>
+                <div class="text-center py-6 text-gray-500">
+                    <i class="fas fa-paperclip text-2xl mb-2 opacity-50"></i>
+                    <p class="text-sm">No attachments found for this task</p>
+                    <p class="text-xs mt-1">Upload attachments when creating or editing tasks</p>
+                </div>
+            <?php endif; ?>
         </div>
-        <?php endif; ?>
         
         <!-- Reassignment Requests -->
         <?php if (!empty($reassignRequests)): ?>
